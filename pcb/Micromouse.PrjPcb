@@ -1,4 +1,4 @@
-[Design]
+﻿[Design]
 Version=1.0
 HierarchyMode=0
 ChannelRoomNamingStyle=0
@@ -36,6 +36,10 @@ ConstraintManagerFlow=0
 IsVirtualBomDocumentRemoved=0
 OutputPath=
 LogFolderPath=
+ManagedProjectGUID=14C86CE2-B6EE-4E03-96C5-BEB5D468BDF2
+VaultGUID=DB433F30-6932-488A-99D8-006C0636F662
+ReleaseVaultName=David Mihić
+ItemGUID=14C86CE2-B6EE-4E03-96C5-BEB5D468BDF2
 IncludeDesignInRelease=0
 CrossRefSheetStyle=1
 CrossRefLocationStyle=1
