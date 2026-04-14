@@ -1,0 +1,20 @@
+cmake_minimum_required(VERSION 3.20)
+project(micromouse C)
+
+set(CMAKE_C_STANDARD 11)
+
+include_directories(include)
+
+find_package(SDL2 REQUIRED)
+
+add_executable(micromouse
+    src/main.c
+    src/maze.c
+    src/maze_visual.c
+    src/floodfill.c
+    src/planner.c
+    src/belief_maze.c
+    src/state.c
+)
+
+target_link_libraries(micromouse SDL2::SDL2)
