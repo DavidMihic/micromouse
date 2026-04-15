@@ -3,3 +3,8 @@ build/
 *.o
 *.exe
 *.out
+
+# Altium local history and previews, logs and temp files
+__Previews
+History
+Project\ Logs\ for*/
