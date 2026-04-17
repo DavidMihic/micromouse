@@ -4,6 +4,9 @@ build/
 *.exe
 *.out
 
+# Solidworks temporary files
+~$*
+
 # Altium local history and previews, logs and temp files
 __Previews
 History
