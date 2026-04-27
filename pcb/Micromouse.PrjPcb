@@ -154,6 +154,10 @@ DItemRevisionGUID=
 GenerateClassCluster=0
 DocumentUniqueId=BNFMSXMV
 
+[GeneratedDocument1]
+DocumentPath=Project Outputs for Micromouse\Design Rule Check - Micromouse_PCB_Final.html
+DItemRevisionGUID=
+
 [Parameter1]
 Name=Project
 Value=Micromouse
