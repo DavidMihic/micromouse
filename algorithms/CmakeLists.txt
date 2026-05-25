@@ -7,6 +7,10 @@ include_directories(include)
 
 find_package(SDL2 REQUIRED)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Target 1: micromouse
+# Original discrete logic simulation — untouched, always buildable.
+# ─────────────────────────────────────────────────────────────────────────────
 add_executable(micromouse
     src/main.c
     src/maze.c
@@ -18,3 +22,26 @@ add_executable(micromouse
 )
 
 target_link_libraries(micromouse SDL2::SDL2)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Target 2: micromouse_sim
+# Continuous simulation with HAL, finite velocity, SDL2 visualizer.
+# Links against shared core logic. Never modifies src/.
+# ─────────────────────────────────────────────────────────────────────────────
+add_executable(micromouse_sim
+    simulation/sim_main.c
+    simulation/sim_hal.c
+    simulation/sim_mouse.c
+    simulation/sim_loop.c
+    simulation/sim_nav.c
+    simulation/sim_render.c
+
+    # Shared core — algorithm logic, never modified by sim
+    src/maze.c
+    src/floodfill.c
+    src/planner.c
+    src/belief_maze.c
+)
+
+target_include_directories(micromouse_sim PRIVATE include simulation)
+target_link_libraries(micromouse_sim SDL2::SDL2 m)
