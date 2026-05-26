@@ -150,65 +150,66 @@ int __io_putchar(int ch)
     return ch;
 }
 
-static int16_t clamp_pwm(int16_t value)
-{
-    if (value > MOTOR_PWM_MAX)  return MOTOR_PWM_MAX;
-    if (value < -MOTOR_PWM_MAX) return -MOTOR_PWM_MAX;
-    return value;
-}
-
-static uint32_t pwm_to_compare(int16_t pwm)
-{
-    uint32_t arr = __HAL_TIM_GET_AUTORELOAD(&htim1);
-    return ((uint32_t)abs(pwm) * arr) / MOTOR_PWM_MAX;
-}
-
-static void motor_set_one(int16_t pwm, uint32_t ch_in1, uint32_t ch_in2)
-{
-    pwm = clamp_pwm(pwm);
-
-    uint32_t compare = pwm_to_compare(pwm);
-
-    if (pwm > 0)
-    {
-        // Forward
-        __HAL_TIM_SET_COMPARE(&htim1, ch_in2, 0);
-        __HAL_TIM_SET_COMPARE(&htim1, ch_in1, compare);
-    }
-    else if (pwm < 0)
-    {
-        // Reverse
-        __HAL_TIM_SET_COMPARE(&htim1, ch_in1, 0);
-        __HAL_TIM_SET_COMPARE(&htim1, ch_in2, compare);
-    }
-    else
-    {
-        // Stop / coast depending on driver input mode
-        __HAL_TIM_SET_COMPARE(&htim1, ch_in1, 0);
-        __HAL_TIM_SET_COMPARE(&htim1, ch_in2, 0);
-    }
-}
-
 void motors_start_pwm(void)
 {
     HAL_TIM_PWM_Start(&htim1, L_IN1_CH);
     HAL_TIM_PWM_Start(&htim1, L_IN2_CH);
     HAL_TIM_PWM_Start(&htim1, R_IN1_CH);
     HAL_TIM_PWM_Start(&htim1, R_IN2_CH);
-
-    motor_set_one(0, L_IN1_CH, L_IN2_CH);
-    motor_set_one(0, R_IN1_CH, R_IN2_CH);
 }
 
-void motors_set(int16_t left_pwm, int16_t right_pwm)
+static int16_t clamp_cmd(int16_t value)
 {
-    motor_set_one(left_pwm,  L_IN1_CH, L_IN2_CH);
-    motor_set_one(right_pwm, R_IN1_CH, R_IN2_CH);
+    if (value > MOTOR_PWM_MAX)  return MOTOR_PWM_MAX;
+    if (value < -MOTOR_PWM_MAX) return -MOTOR_PWM_MAX;
+    return value;
 }
 
-void motors_stop(void)
+static void set_pwm_permille(uint32_t channel, uint16_t permille)
 {
-    motors_set(0, 0);
+    if (permille > 1000)
+        permille = 1000;
+
+    uint32_t period = __HAL_TIM_GET_AUTORELOAD(&htim1) + 1;
+    uint32_t compare = ((uint32_t)permille * period) / 1000;
+
+    __HAL_TIM_SET_COMPARE(&htim1, channel, compare);
+}
+
+static void motor_set_one_brake_pwm(int16_t cmd, uint32_t ch_in1, uint32_t ch_in2)
+{
+    cmd = clamp_cmd(cmd);
+
+    if (cmd > 0)
+    {
+        // Forward:
+        // IN1 always high.
+        // IN2 high during brake, low during drive.
+        set_pwm_permille(ch_in1, 1000);
+        set_pwm_permille(ch_in2, 1000 - cmd);
+    }
+    else if (cmd < 0)
+    {
+        // Reverse:
+        // IN2 always high.
+        // IN1 high during brake, low during drive.
+        uint16_t mag = -cmd;
+
+        set_pwm_permille(ch_in1, 1000 - mag);
+        set_pwm_permille(ch_in2, 1000);
+    }
+    else
+    {
+        // Coast / sleep
+        set_pwm_permille(ch_in1, 0);
+        set_pwm_permille(ch_in2, 0);
+    }
+}
+
+void motors_set(int16_t left_cmd, int16_t right_cmd)
+{
+    motor_set_one_brake_pwm(left_cmd,  L_IN1_CH, L_IN2_CH);
+    motor_set_one_brake_pwm(right_cmd, R_IN1_CH, R_IN2_CH);
 }
 
 static void NeoPixel_SetPixel(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
@@ -404,6 +405,18 @@ static void IR_LED_Pulse_us(uint8_t led, uint32_t pulse_us)
     IR_LED_Off();
 }
 
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
+{
+    if (hadc->Instance == ADC1)
+    {
+        adc1_dma_ready = 1;
+    }
+    else if (hadc->Instance == ADC2)
+    {
+        adc2_dma_ready = 1;
+    }
+}
+
 static void IR_ADC_DMA_Start(void)
 {
     // Optional but recommended on STM32G4
@@ -430,26 +443,15 @@ static void IR_ADC_DMA_Start(void)
 
 static void IR_ADC_UpdateRawValues(void)
 {
-
-    ir_raw[0] = adc2_dma[0];   // IR_REC_1
-    ir_raw[1] = adc1_dma[0];   // IR_REC_2
-    ir_raw[2] = adc1_dma[1];   // IR_REC_3
-    ir_raw[3] = adc1_dma[2];   // IR_REC_4
-    ir_raw[4] = adc1_dma[3];   // IR_REC_5
-    ir_raw[5] = adc2_dma[1];   // IR_REC_6
+// Raw data is inverted
+    ir_raw[0] = 4095 - adc2_dma[0];   // IR_REC_1
+    ir_raw[1] = 4095 - adc1_dma[0];   // IR_REC_2
+    ir_raw[2] = 4095 - adc1_dma[1];   // IR_REC_3
+    ir_raw[3] = 4095 - adc1_dma[2];   // IR_REC_4
+    ir_raw[4] = 4095 - adc1_dma[3];   // IR_REC_5
+    ir_raw[5] = 4095 - adc2_dma[1];   // IR_REC_6
 }
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
-{
-    if (hadc->Instance == ADC1)
-    {
-        adc1_dma_ready = 1;
-    }
-    else if (hadc->Instance == ADC2)
-    {
-        adc2_dma_ready = 1;
-    }
-}
 
 /* USER CODE END 0 */
 
@@ -514,33 +516,58 @@ int main(void)
   IR_LED_Off();
 
   IR_ADC_DMA_Start();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-
-
+ /*
+  * ADC1 CH1 - IR5
+  *
+  */
+  int16_t left_prev = 0;
+  int16_t right_prev = 0;
   while (1)
   {
-	IR_LED_Pulse_us(IR_LED_6, 100);
-	if (adc1_dma_ready && adc2_dma_ready)
-	{
-		adc1_dma_ready = 0;
-		adc2_dma_ready = 0;
 
-		IR_ADC_UpdateRawValues();
+	  	motors_set(-0, 0);
 
-		printf("IR: %4u %4u %4u %4u %4u %4u\r\n",
-			   ir_raw[0],
-			   ir_raw[1],
-			   ir_raw[2],
-			   ir_raw[3],
-			   ir_raw[4],
-			   ir_raw[5]);
-	}
+		int16_t left_now  = (int16_t)__HAL_TIM_GET_COUNTER(&htim2);
+		int16_t right_now = (int16_t)__HAL_TIM_GET_COUNTER(&htim4);
 
-	HAL_Delay(40);
+		int16_t left_delta  = left_now  - left_prev;
+		int16_t right_delta = right_now - right_prev;
+
+		left_prev = left_now;
+		right_prev = right_now;
+
+		printf("L: %6d  dL: %6d | R: %6d  dR: %6d\r\n",
+			 left_now, left_delta,
+			 right_now, right_delta);
+
+		HAL_Delay(100);
+
+//
+//	IR_LED_Pulse_us(IR_LED_5, 100);
+//
+//	if (adc1_dma_ready && adc2_dma_ready)
+//	{
+//		adc1_dma_ready = 0;
+//		adc2_dma_ready = 0;
+//
+//		IR_ADC_UpdateRawValues();
+//
+//		printf("IR: %4u %4u %4u %4u %4u %4u\r\n",
+//			   ir_raw[0],
+//			   ir_raw[1],
+//			   ir_raw[2],
+//			   ir_raw[3],
+//			   ir_raw[4],
+//			   ir_raw[5]);
+//	}
+//
+//	HAL_Delay(40);
 
     /* USER CODE END WHILE */
 
@@ -659,7 +686,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_5;
+  sConfig.Channel = ADC_CHANNEL_14;
   sConfig.Rank = ADC_REGULAR_RANK_2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -668,6 +695,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
+  sConfig.Channel = ADC_CHANNEL_11;
   sConfig.Rank = ADC_REGULAR_RANK_3;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -676,6 +704,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
+  sConfig.Channel = ADC_CHANNEL_5;
   sConfig.Rank = ADC_REGULAR_RANK_4;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -743,6 +772,7 @@ static void MX_ADC2_Init(void)
 
   /** Configure Regular Channel
   */
+  sConfig.Channel = ADC_CHANNEL_15;
   sConfig.Rank = ADC_REGULAR_RANK_2;
   if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
   {
