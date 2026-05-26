@@ -21,8 +21,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
+
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,8 +34,47 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define IMU_CS_LOW()   HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET)
-#define IMU_CS_HIGH()  HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET)
+#define NEOPIXEL_TIMER        htim8
+#define NEOPIXEL_CHANNEL      TIM_CHANNEL_1
+
+#define NEOPIXEL_ARR          211
+
+#define WS2812_0              60
+#define WS2812_1              120
+
+#define NUM_LEDS              1
+#define BITS_PER_LED          24
+#define RESET_SLOTS           50
+
+#define LSM6DSO32_WHO_AM_I   0x0F
+
+#define LSM6_CTRL1_XL   0x10
+#define LSM6_CTRL2_G    0x11
+#define LSM6_CTRL3_C    0x12
+#define LSM6_OUTX_L_G   0x22
+
+#define IMU_CS_LOW()    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET)
+#define IMU_CS_HIGH()   HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET)
+
+#define ADC1_IR_COUNT  4
+#define ADC2_IR_COUNT  2
+
+#define MOTOR_PWM_MAX 1000
+
+#define L_IN1_CH   TIM_CHANNEL_1   // PA8
+#define L_IN2_CH   TIM_CHANNEL_2   // PA9
+#define R_IN1_CH   TIM_CHANNEL_3   // PA10
+#define R_IN2_CH   TIM_CHANNEL_4   // PA11
+
+#define IR_LED_1   0
+#define IR_LED_2   1
+#define IR_LED_3   2
+#define IR_LED_4   3
+#define IR_LED_5   4
+#define IR_LED_6   5
+
+#define IR_LED_MAX_PULSE_US  400U
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -76,6 +117,7 @@ static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
+static uint16_t pwmData[NUM_LEDS * BITS_PER_LED + RESET_SLOTS];
 
 /* USER CODE END PFP */
 
@@ -91,14 +133,22 @@ uint8_t _dip_state_3 = 0;
 int16_t left_cnt = 0;
 int16_t right_cnt = 0;
 
+volatile uint16_t adc1_dma[ADC1_IR_COUNT];
+volatile uint16_t adc2_dma[ADC2_IR_COUNT];
+
+uint16_t ir_raw[6];
+
+volatile uint8_t adc1_dma_ready = 0;
+volatile uint8_t adc2_dma_ready = 0;
 // TIM1 channel mapping
 
-#define MOTOR_PWM_MAX 1000
-
-#define L_IN1_CH   TIM_CHANNEL_1   // PA8
-#define L_IN2_CH   TIM_CHANNEL_2   // PA9
-#define R_IN1_CH   TIM_CHANNEL_3   // PA10
-#define R_IN2_CH   TIM_CHANNEL_4   // PA11
+int __io_putchar(int ch)
+{
+    /* Place your implementation here.
+       e.g., write a character to the USART and loop until the end of transmission */
+    HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+    return ch;
+}
 
 static int16_t clamp_pwm(int16_t value)
 {
@@ -161,6 +211,246 @@ void motors_stop(void)
     motors_set(0, 0);
 }
 
+static void NeoPixel_SetPixel(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
+{
+    uint32_t color;
+
+    // WS2812 expects GRB order, not RGB
+    color = ((uint32_t)g << 16) | ((uint32_t)r << 8) | b;
+
+    for (uint8_t bit = 0; bit < 24; bit++)
+    {
+        if (color & (1 << (23 - bit)))
+            pwmData[led * 24 + bit] = WS2812_1;
+        else
+            pwmData[led * 24 + bit] = WS2812_0;
+    }
+}
+
+void NeoPixel_Show(void)
+{
+    // Add reset low time
+    for (uint16_t i = NUM_LEDS * BITS_PER_LED; i < NUM_LEDS * BITS_PER_LED + RESET_SLOTS; i++)
+    {
+        pwmData[i] = 0;
+    }
+
+    HAL_TIM_PWM_Start_DMA(
+        &NEOPIXEL_TIMER,
+        NEOPIXEL_CHANNEL,
+        (uint32_t *)pwmData,
+        NUM_LEDS * BITS_PER_LED + RESET_SLOTS
+    );
+}
+
+void NeoPixel_SetColor(uint8_t r, uint8_t g, uint8_t b)
+{
+    NeoPixel_SetPixel(0, r, g, b);
+    NeoPixel_Show();
+}
+
+void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM8)
+    {
+        HAL_TIM_PWM_Stop_DMA(&NEOPIXEL_TIMER, NEOPIXEL_CHANNEL);
+        __HAL_TIM_SET_COMPARE(&NEOPIXEL_TIMER, NEOPIXEL_CHANNEL, 0);
+    }
+}
+
+uint8_t IMU_ReadWhoAmI(void)
+{
+    uint8_t tx[2] = { LSM6DSO32_WHO_AM_I | 0x80, 0x00 };
+    uint8_t rx[2] = { 0 };
+
+    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET);
+
+    HAL_SPI_TransmitReceive(&hspi1, tx, rx, 2, HAL_MAX_DELAY);
+
+    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
+
+    return rx[1];
+}
+
+void IMU_WriteReg(uint8_t reg, uint8_t value)
+{
+    uint8_t tx[2];
+
+    tx[0] = reg & 0x7F;   // write command
+    tx[1] = value;
+
+    IMU_CS_LOW();
+    HAL_SPI_Transmit(&hspi1, tx, 2, HAL_MAX_DELAY);
+    IMU_CS_HIGH();
+}
+
+void IMU_ReadRegs(uint8_t reg, uint8_t *data, uint8_t len)
+{
+    uint8_t addr = reg | 0x80;   // read command
+
+    IMU_CS_LOW();
+    HAL_SPI_Transmit(&hspi1, &addr, 1, HAL_MAX_DELAY);
+    HAL_SPI_Receive(&hspi1, data, len, HAL_MAX_DELAY);
+    IMU_CS_HIGH();
+}
+
+void IMU_InitSimple(void)
+{
+    /*
+     * CTRL3_C = 0x44
+     * BDU = 1, IF_INC = 1
+     */
+    IMU_WriteReg(LSM6_CTRL3_C, 0x44);
+
+    /*
+     * CTRL1_XL = 0x60
+     * Accelerometer ON, 416 Hz, ±4 g
+     */
+    IMU_WriteReg(LSM6_CTRL1_XL, 0x60);
+
+    /*
+     * CTRL2_G = 0x60
+     * Gyroscope ON, 416 Hz, ±250 dps
+     */
+    IMU_WriteReg(LSM6_CTRL2_G, 0x60);
+
+    HAL_Delay(50);
+}
+
+void IMU_ReadRaw(int16_t *gx, int16_t *gy, int16_t *gz,
+                 int16_t *ax, int16_t *ay, int16_t *az)
+{
+    uint8_t data[12];
+
+    IMU_ReadRegs(LSM6_OUTX_L_G, data, 12);
+
+    *gx = (int16_t)((data[1]  << 8) | data[0]);
+    *gy = (int16_t)((data[3]  << 8) | data[2]);
+    *gz = (int16_t)((data[5]  << 8) | data[4]);
+
+    *ax = (int16_t)((data[7]  << 8) | data[6]);
+    *ay = (int16_t)((data[9]  << 8) | data[8]);
+    *az = (int16_t)((data[11] << 8) | data[10]);
+}
+
+static void IR_Demux_Disable(void)
+{
+    // SN74AHC238 selected output is active only when enable is active.
+    // In your schematic, DMUX_EN goes to the active-high enable pin.
+    HAL_GPIO_WritePin(DMUX_EN_GPIO_Port, DMUX_EN_Pin, GPIO_PIN_RESET);
+}
+
+static void IR_Demux_Enable(void)
+{
+    HAL_GPIO_WritePin(DMUX_EN_GPIO_Port, DMUX_EN_Pin, GPIO_PIN_SET);
+}
+
+static void IR_Demux_Select(uint8_t led)
+{
+    // led = 0 selects IR_EM_1
+    // led = 1 selects IR_EM_2
+    // ...
+    // led = 5 selects IR_EM_6
+
+    HAL_GPIO_WritePin(DMUX_A0_GPIO_Port, DMUX_A0_Pin,
+                      (led & 0x01) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+
+    HAL_GPIO_WritePin(DMUX_A1_GPIO_Port, DMUX_A1_Pin,
+                      (led & 0x02) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+
+    HAL_GPIO_WritePin(DMUX_A2_GPIO_Port, DMUX_A2_Pin,
+                      (led & 0x04) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+}
+
+static void IR_LED_On(uint8_t led)
+{
+    IR_Demux_Disable();      // avoid glitches while changing address
+    IR_Demux_Select(led);
+    IR_Demux_Enable();
+}
+
+static void IR_LED_Off(void)
+{
+    IR_Demux_Disable();
+}
+
+static void DWT_Delay_Init(void)
+{
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;  // Enable DWT access
+    DWT->CYCCNT = 0;                                 // Reset cycle counter
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;             // Enable cycle counter
+}
+
+static void delay_us(uint32_t us)
+{
+    uint32_t start = DWT->CYCCNT;
+    uint32_t cycles = (SystemCoreClock / 1000000U) * us;
+
+    while ((uint32_t)(DWT->CYCCNT - start) < cycles)
+    {
+        // wait
+    }
+}
+
+static void IR_LED_Pulse_us(uint8_t led, uint32_t pulse_us)
+{
+    if (pulse_us > IR_LED_MAX_PULSE_US)
+    {
+        pulse_us = IR_LED_MAX_PULSE_US;  // safety limit for your SFH4545 pulse
+    }
+
+    IR_LED_On(led);
+    delay_us(pulse_us);
+    IR_LED_Off();
+}
+
+static void IR_ADC_DMA_Start(void)
+{
+    // Optional but recommended on STM32G4
+    if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    if (HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc1_dma, ADC1_IR_COUNT) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    if (HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc2_dma, ADC2_IR_COUNT) != HAL_OK)
+    {
+        Error_Handler();
+    }
+}
+
+static void IR_ADC_UpdateRawValues(void)
+{
+
+    ir_raw[0] = adc2_dma[0];   // IR_REC_1
+    ir_raw[1] = adc1_dma[0];   // IR_REC_2
+    ir_raw[2] = adc1_dma[1];   // IR_REC_3
+    ir_raw[3] = adc1_dma[2];   // IR_REC_4
+    ir_raw[4] = adc1_dma[3];   // IR_REC_5
+    ir_raw[5] = adc2_dma[1];   // IR_REC_6
+}
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
+{
+    if (hadc->Instance == ADC1)
+    {
+        adc1_dma_ready = 1;
+    }
+    else if (hadc->Instance == ADC2)
+    {
+        adc2_dma_ready = 1;
+    }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -211,29 +501,48 @@ int main(void)
 
   motors_start_pwm();
 
-  HAL_Delay(1000);
+  int16_t gx, gy, gz;
+  int16_t ax, ay, az;
 
+  HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
+  HAL_Delay(100);
+
+  IMU_InitSimple();
+
+  DWT_Delay_Init();
+
+  IR_LED_Off();
+
+  IR_ADC_DMA_Start();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+
+
   while (1)
   {
-    /* USER CODE END WHILE */
+	IR_LED_Pulse_us(IR_LED_6, 100);
+	if (adc1_dma_ready && adc2_dma_ready)
+	{
+		adc1_dma_ready = 0;
+		adc2_dma_ready = 0;
 
-//	  _dip_state_1 = HAL_GPIO_ReadPin(DIP_1_GPIO_Port, DIP_1_Pin);
-//	  _dip_state_2 = HAL_GPIO_ReadPin(DIP_2_GPIO_Port, DIP_2_Pin);
-//	  _dip_state_3 = HAL_GPIO_ReadPin(DIP_3_GPIO_Port, DIP_3_Pin);
-//
-//	  _button_state_1 = HAL_GPIO_ReadPin(BTN_1_GPIO_Port, BTN_1_Pin);
-//	  _button_state_2 = HAL_GPIO_ReadPin(BTN_2_GPIO_Port, BTN_2_Pin);
-//
-	  left_cnt = (int16_t) __HAL_TIM_GET_COUNTER(&htim2);
-	  right_cnt = (int16_t) __HAL_TIM_GET_COUNTER(&htim4);
-//
-//	  HAL_Delay(5);
-      motors_set(700, 500);
-      HAL_Delay(2000);
+		IR_ADC_UpdateRawValues();
+
+		printf("IR: %4u %4u %4u %4u %4u %4u\r\n",
+			   ir_raw[0],
+			   ir_raw[1],
+			   ir_raw[2],
+			   ir_raw[3],
+			   ir_raw[4],
+			   ir_raw[5]);
+	}
+
+	HAL_Delay(40);
+
+    /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
   }
@@ -314,7 +623,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
   hadc1.Init.NbrOfConversion = 4;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
@@ -339,7 +648,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_12;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_247CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_92CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
@@ -406,13 +715,13 @@ static void MX_ADC2_Init(void)
   hadc2.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc2.Init.EOCSelection = ADC_EOC_SEQ_CONV;
   hadc2.Init.LowPowerAutoWait = DISABLE;
-  hadc2.Init.ContinuousConvMode = DISABLE;
+  hadc2.Init.ContinuousConvMode = ENABLE;
   hadc2.Init.NbrOfConversion = 2;
   hadc2.Init.DiscontinuousConvMode = DISABLE;
   hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc2.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc2.Init.DMAContinuousRequests = ENABLE;
-  hadc2.Init.Overrun = ADC_OVR_DATA_OVERWRITTEN;
+  hadc2.Init.Overrun = ADC_OVR_DATA_PRESERVED;
   hadc2.Init.OversamplingMode = DISABLE;
   if (HAL_ADC_Init(&hadc2) != HAL_OK)
   {
@@ -423,7 +732,7 @@ static void MX_ADC2_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_12;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_247CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_92CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
@@ -465,10 +774,10 @@ static void MX_SPI1_Init(void)
   hspi1.Init.Mode = SPI_MODE_MASTER;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
   hspi1.Init.CLKPhase = SPI_PHASE_2EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
