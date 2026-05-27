@@ -274,141 +274,6 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* hadc)
 }
 
 /**
-  * @brief CORDIC MSP Initialization
-  * This function configures the hardware resources used in this example
-  * @param hcordic: CORDIC handle pointer
-  * @retval None
-  */
-void HAL_CORDIC_MspInit(CORDIC_HandleTypeDef* hcordic)
-{
-  if(hcordic->Instance==CORDIC)
-  {
-    /* USER CODE BEGIN CORDIC_MspInit 0 */
-
-    /* USER CODE END CORDIC_MspInit 0 */
-    /* Peripheral clock enable */
-    __HAL_RCC_CORDIC_CLK_ENABLE();
-    /* USER CODE BEGIN CORDIC_MspInit 1 */
-
-    /* USER CODE END CORDIC_MspInit 1 */
-
-  }
-
-}
-
-/**
-  * @brief CORDIC MSP De-Initialization
-  * This function freeze the hardware resources used in this example
-  * @param hcordic: CORDIC handle pointer
-  * @retval None
-  */
-void HAL_CORDIC_MspDeInit(CORDIC_HandleTypeDef* hcordic)
-{
-  if(hcordic->Instance==CORDIC)
-  {
-    /* USER CODE BEGIN CORDIC_MspDeInit 0 */
-
-    /* USER CODE END CORDIC_MspDeInit 0 */
-    /* Peripheral clock disable */
-    __HAL_RCC_CORDIC_CLK_DISABLE();
-    /* USER CODE BEGIN CORDIC_MspDeInit 1 */
-
-    /* USER CODE END CORDIC_MspDeInit 1 */
-  }
-
-}
-
-/**
-  * @brief CRC MSP Initialization
-  * This function configures the hardware resources used in this example
-  * @param hcrc: CRC handle pointer
-  * @retval None
-  */
-void HAL_CRC_MspInit(CRC_HandleTypeDef* hcrc)
-{
-  if(hcrc->Instance==CRC)
-  {
-    /* USER CODE BEGIN CRC_MspInit 0 */
-
-    /* USER CODE END CRC_MspInit 0 */
-    /* Peripheral clock enable */
-    __HAL_RCC_CRC_CLK_ENABLE();
-    /* USER CODE BEGIN CRC_MspInit 1 */
-
-    /* USER CODE END CRC_MspInit 1 */
-
-  }
-
-}
-
-/**
-  * @brief CRC MSP De-Initialization
-  * This function freeze the hardware resources used in this example
-  * @param hcrc: CRC handle pointer
-  * @retval None
-  */
-void HAL_CRC_MspDeInit(CRC_HandleTypeDef* hcrc)
-{
-  if(hcrc->Instance==CRC)
-  {
-    /* USER CODE BEGIN CRC_MspDeInit 0 */
-
-    /* USER CODE END CRC_MspDeInit 0 */
-    /* Peripheral clock disable */
-    __HAL_RCC_CRC_CLK_DISABLE();
-    /* USER CODE BEGIN CRC_MspDeInit 1 */
-
-    /* USER CODE END CRC_MspDeInit 1 */
-  }
-
-}
-
-/**
-  * @brief FMAC MSP Initialization
-  * This function configures the hardware resources used in this example
-  * @param hfmac: FMAC handle pointer
-  * @retval None
-  */
-void HAL_FMAC_MspInit(FMAC_HandleTypeDef* hfmac)
-{
-  if(hfmac->Instance==FMAC)
-  {
-    /* USER CODE BEGIN FMAC_MspInit 0 */
-
-    /* USER CODE END FMAC_MspInit 0 */
-    /* Peripheral clock enable */
-    __HAL_RCC_FMAC_CLK_ENABLE();
-    /* USER CODE BEGIN FMAC_MspInit 1 */
-
-    /* USER CODE END FMAC_MspInit 1 */
-
-  }
-
-}
-
-/**
-  * @brief FMAC MSP De-Initialization
-  * This function freeze the hardware resources used in this example
-  * @param hfmac: FMAC handle pointer
-  * @retval None
-  */
-void HAL_FMAC_MspDeInit(FMAC_HandleTypeDef* hfmac)
-{
-  if(hfmac->Instance==FMAC)
-  {
-    /* USER CODE BEGIN FMAC_MspDeInit 0 */
-
-    /* USER CODE END FMAC_MspDeInit 0 */
-    /* Peripheral clock disable */
-    __HAL_RCC_FMAC_CLK_DISABLE();
-    /* USER CODE BEGIN FMAC_MspDeInit 1 */
-
-    /* USER CODE END FMAC_MspDeInit 1 */
-  }
-
-}
-
-/**
   * @brief SPI MSP Initialization
   * This function configures the hardware resources used in this example
   * @param hspi: SPI handle pointer
@@ -494,6 +359,20 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* htim_base)
     /* USER CODE BEGIN TIM1_MspInit 1 */
 
     /* USER CODE END TIM1_MspInit 1 */
+  }
+  else if(htim_base->Instance==TIM6)
+  {
+    /* USER CODE BEGIN TIM6_MspInit 0 */
+
+    /* USER CODE END TIM6_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_TIM6_CLK_ENABLE();
+    /* TIM6 interrupt Init */
+    HAL_NVIC_SetPriority(TIM6_DAC_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
+    /* USER CODE BEGIN TIM6_MspInit 1 */
+
+    /* USER CODE END TIM6_MspInit 1 */
   }
   else if(htim_base->Instance==TIM8)
   {
@@ -670,6 +549,20 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* htim_base)
     /* USER CODE BEGIN TIM1_MspDeInit 1 */
 
     /* USER CODE END TIM1_MspDeInit 1 */
+  }
+  else if(htim_base->Instance==TIM6)
+  {
+    /* USER CODE BEGIN TIM6_MspDeInit 0 */
+
+    /* USER CODE END TIM6_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_TIM6_CLK_DISABLE();
+
+    /* TIM6 interrupt DeInit */
+    HAL_NVIC_DisableIRQ(TIM6_DAC_IRQn);
+    /* USER CODE BEGIN TIM6_MspDeInit 1 */
+
+    /* USER CODE END TIM6_MspDeInit 1 */
   }
   else if(htim_base->Instance==TIM8)
   {

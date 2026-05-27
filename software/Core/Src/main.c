@@ -46,17 +46,12 @@ ADC_HandleTypeDef hadc2;
 DMA_HandleTypeDef hdma_adc1;
 DMA_HandleTypeDef hdma_adc2;
 
-CORDIC_HandleTypeDef hcordic;
-
-CRC_HandleTypeDef hcrc;
-
-FMAC_HandleTypeDef hfmac;
-
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim8;
 DMA_HandleTypeDef hdma_tim8_ch1;
 
@@ -80,9 +75,7 @@ static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_CORDIC_Init(void);
-static void MX_CRC_Init(void);
-static void MX_FMAC_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -153,9 +146,7 @@ int main(void)
   MX_TIM4_Init();
   MX_TIM8_Init();
   MX_USART2_UART_Init();
-  MX_CORDIC_Init();
-  MX_CRC_Init();
-  MX_FMAC_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -376,89 +367,6 @@ static void MX_ADC2_Init(void)
   /* USER CODE BEGIN ADC2_Init 2 */
 
   /* USER CODE END ADC2_Init 2 */
-
-}
-
-/**
-  * @brief CORDIC Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_CORDIC_Init(void)
-{
-
-  /* USER CODE BEGIN CORDIC_Init 0 */
-
-  /* USER CODE END CORDIC_Init 0 */
-
-  /* USER CODE BEGIN CORDIC_Init 1 */
-
-  /* USER CODE END CORDIC_Init 1 */
-  hcordic.Instance = CORDIC;
-  if (HAL_CORDIC_Init(&hcordic) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN CORDIC_Init 2 */
-
-  /* USER CODE END CORDIC_Init 2 */
-
-}
-
-/**
-  * @brief CRC Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_CRC_Init(void)
-{
-
-  /* USER CODE BEGIN CRC_Init 0 */
-
-  /* USER CODE END CRC_Init 0 */
-
-  /* USER CODE BEGIN CRC_Init 1 */
-
-  /* USER CODE END CRC_Init 1 */
-  hcrc.Instance = CRC;
-  hcrc.Init.DefaultPolynomialUse = DEFAULT_POLYNOMIAL_ENABLE;
-  hcrc.Init.DefaultInitValueUse = DEFAULT_INIT_VALUE_ENABLE;
-  hcrc.Init.InputDataInversionMode = CRC_INPUTDATA_INVERSION_NONE;
-  hcrc.Init.OutputDataInversionMode = CRC_OUTPUTDATA_INVERSION_DISABLE;
-  hcrc.InputDataFormat = CRC_INPUTDATA_FORMAT_BYTES;
-  if (HAL_CRC_Init(&hcrc) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN CRC_Init 2 */
-
-  /* USER CODE END CRC_Init 2 */
-
-}
-
-/**
-  * @brief FMAC Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_FMAC_Init(void)
-{
-
-  /* USER CODE BEGIN FMAC_Init 0 */
-
-  /* USER CODE END FMAC_Init 0 */
-
-  /* USER CODE BEGIN FMAC_Init 1 */
-
-  /* USER CODE END FMAC_Init 1 */
-  hfmac.Instance = FMAC;
-  if (HAL_FMAC_Init(&hfmac) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN FMAC_Init 2 */
-
-  /* USER CODE END FMAC_Init 2 */
 
 }
 
@@ -691,6 +599,44 @@ static void MX_TIM4_Init(void)
   /* USER CODE BEGIN TIM4_Init 2 */
 
   /* USER CODE END TIM4_Init 2 */
+
+}
+
+/**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 169;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 499;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
 
 }
 
