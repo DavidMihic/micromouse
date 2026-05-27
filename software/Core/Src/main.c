@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include "motor.h"
 #include "encoder.h"
+#include "neopixel.h"
 
 /* USER CODE END Includes */
 
@@ -211,44 +212,6 @@ void motors_set(int16_t left_cmd, int16_t right_cmd)
 {
     motor_set_one_brake_pwm(left_cmd,  L_IN1_CH, L_IN2_CH);
     motor_set_one_brake_pwm(right_cmd, R_IN1_CH, R_IN2_CH);
-}
-
-static void NeoPixel_SetPixel(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
-{
-    uint32_t color;
-
-    // WS2812 expects GRB order, not RGB
-    color = ((uint32_t)g << 16) | ((uint32_t)r << 8) | b;
-
-    for (uint8_t bit = 0; bit < 24; bit++)
-    {
-        if (color & (1 << (23 - bit)))
-            pwmData[led * 24 + bit] = WS2812_1;
-        else
-            pwmData[led * 24 + bit] = WS2812_0;
-    }
-}
-
-void NeoPixel_Show(void)
-{
-    // Add reset low time
-    for (uint16_t i = NUM_LEDS * BITS_PER_LED; i < NUM_LEDS * BITS_PER_LED + RESET_SLOTS; i++)
-    {
-        pwmData[i] = 0;
-    }
-
-    HAL_TIM_PWM_Start_DMA(
-        &NEOPIXEL_TIMER,
-        NEOPIXEL_CHANNEL,
-        (uint32_t *)pwmData,
-        NUM_LEDS * BITS_PER_LED + RESET_SLOTS
-    );
-}
-
-void NeoPixel_SetColor(uint8_t r, uint8_t g, uint8_t b)
-{
-    NeoPixel_SetPixel(0, r, g, b);
-    NeoPixel_Show();
 }
 
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
@@ -478,6 +441,8 @@ Motor motor_right =
 Encoder enc_left;
 Encoder enc_right;
 
+NeoPixel neopixel;
+
 /* USER CODE END 0 */
 
 /**
@@ -554,6 +519,8 @@ int main(void)
                360,
                1);
 
+  NeoPixel_Init(&neopixel, &htim8, TIM_CHANNEL_1);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -563,6 +530,10 @@ int main(void)
   * ADC1 CH1 - IR5
   *
   */
+
+  NeoPixel_SetColor(&neopixel, COLOR_OFF);
+  NeoPixel_Show(&neopixel);
+
   uint32_t last_tick = HAL_GetTick();
   while (1)
   {
