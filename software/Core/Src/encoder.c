@@ -1,48 +1,98 @@
-/*
- * encoder.c
- *
- *  Created on: May 27, 2026
- *      Author: andrija
- */
-
 #include "encoder.h"
 
 #define ENCODER_TWO_PI 6.28318530718f
 
-static uint32_t encoder_read_raw(const Encoder *enc)
+static uint32_t Encoder_ReadCounter(const Encoder *enc)
 {
-    return __HAL_TIM_GET_COUNTER(enc->htim);
+    return (uint32_t)__HAL_TIM_GET_COUNTER(enc->htim);
+}
+
+static uint32_t Encoder_ReadAutoReload(const Encoder *enc)
+{
+    return (uint32_t)(enc->htim->Instance->ARR);
+}
+
+static int32_t Encoder_ComputeWrappedDelta(uint32_t now,
+                                           uint32_t last,
+                                           uint32_t counter_max)
+{
+    /*
+     * Counter range is 0 ... counter_max.
+     *
+     * 16-bit timer: counter_max = 0xFFFF, range = 65536
+     * 32-bit timer: counter_max = 0xFFFFFFFF, range = 4294967296
+     *
+     * Encoder_Update() must be called often enough that the true movement
+     * between updates is less than half the timer range.
+     */
+    const uint64_t range = (uint64_t)counter_max + 1ULL;
+
+    uint64_t forward_delta;
+
+    if (now >= last)
+    {
+        forward_delta = (uint64_t)(now - last);
+    }
+    else
+    {
+        forward_delta = ((uint64_t)counter_max - (uint64_t)last)
+                      + (uint64_t)now
+                      + 1ULL;
+    }
+
+    int64_t signed_delta;
+
+    if (forward_delta >= (range / 2ULL))
+    {
+        signed_delta = (int64_t)forward_delta - (int64_t)range;
+    }
+    else
+    {
+        signed_delta = (int64_t)forward_delta;
+    }
+
+    return (int32_t)signed_delta;
 }
 
 Encoder_Status Encoder_Init(Encoder *enc,
-                              TIM_HandleTypeDef *htim,
-                              Encoder_CounterBits counter_bits,
-                              uint32_t counts_per_rev,
-                              int8_t direction)
+                            TIM_HandleTypeDef *htim,
+                            float ticks_per_rev,
+                            int8_t direction,
+                            float velocity_filter_tau_s)
 {
-    if (enc == NULL || htim == NULL)
+    if (enc == NULL || htim == NULL || ticks_per_rev <= 0.0f)
+    {
         return ENCODER_ERROR;
+    }
 
     enc->htim = htim;
-    enc->counter_bits = counter_bits;
-    enc->counts_per_rev = counts_per_rev;
+    enc->ticks_per_rev = ticks_per_rev;
+    enc->direction = (direction < 0) ? -1 : 1;
 
-    if (direction == -1)
-        enc->direction = -1;
-    else
-        enc->direction = 1;
+    enc->counter_max = Encoder_ReadAutoReload(enc);
 
-    enc->last_raw_count = 0;
-    enc->delta_count = 0;
-    enc->position_count = 0;
+    if (enc->counter_max < 1U)
+    {
+        return ENCODER_ERROR;
+    }
 
-    enc->speed_cps = 0.0f;
-    enc->speed_rps = 0.0f;
-    enc->speed_rpm = 0.0f;
-    enc->speed_rad_s = 0.0f;
+    enc->last_counter = 0U;
+    enc->delta_ticks = 0;
+    enc->position_ticks = 0;
+    enc->position_rad = 0.0f;
+
+    enc->raw_velocity_ticks_s = 0.0f;
+    enc->raw_velocity_rad_s = 0.0f;
+    enc->velocity_ticks_s = 0.0f;
+    enc->velocity_rad_s = 0.0f;
+
+    enc->velocity_filter_tau_s = (velocity_filter_tau_s > 0.0f) ? velocity_filter_tau_s : 0.0f;
+    enc->velocity_filter_initialized = 0U;
 
     if (HAL_TIM_Encoder_Start(enc->htim, TIM_CHANNEL_ALL) != HAL_OK)
+    {
         return ENCODER_ERROR;
+    }
 
     Encoder_Reset(enc);
 
@@ -52,122 +102,149 @@ Encoder_Status Encoder_Init(Encoder *enc,
 void Encoder_Reset(Encoder *enc)
 {
     if (enc == NULL)
+    {
         return;
+    }
 
-    __HAL_TIM_SET_COUNTER(enc->htim, 0);
+    __HAL_TIM_SET_COUNTER(enc->htim, 0U);
 
-    enc->last_raw_count = encoder_read_raw(enc);
-    enc->delta_count = 0;
-    enc->position_count = 0;
+    enc->counter_max = Encoder_ReadAutoReload(enc);
+    enc->last_counter = Encoder_ReadCounter(enc);
 
-    enc->speed_cps = 0.0f;
-    enc->speed_rps = 0.0f;
-    enc->speed_rpm = 0.0f;
-    enc->speed_rad_s = 0.0f;
+    enc->delta_ticks = 0;
+    enc->position_ticks = 0;
+    enc->position_rad = 0.0f;
+
+    enc->raw_velocity_ticks_s = 0.0f;
+    enc->raw_velocity_rad_s = 0.0f;
+    enc->velocity_ticks_s = 0.0f;
+    enc->velocity_rad_s = 0.0f;
+    enc->velocity_filter_initialized = 0U;
 }
 
 void Encoder_Update(Encoder *enc, float dt_s)
 {
     if (enc == NULL)
+    {
         return;
-
-    uint32_t raw_count = encoder_read_raw(enc);
-
-    int32_t delta;
-
-    if (enc->counter_bits == ENCODER_COUNTER_32BIT)
-    {
-        /*
-         * Works correctly with 32-bit timer period = 0xFFFFFFFF.
-         */
-        delta = (int32_t)(raw_count - enc->last_raw_count);
     }
-    else
-    {
-        /*
-         * Works correctly with 16-bit timer period = 0xFFFF.
-         * This handles counter overflow/underflow automatically.
-         */
-        delta = (int16_t)((uint16_t)raw_count - (uint16_t)enc->last_raw_count);
-    }
+
+    const uint32_t now = Encoder_ReadCounter(enc);
+
+    int32_t delta = Encoder_ComputeWrappedDelta(now,
+                                                enc->last_counter,
+                                                enc->counter_max);
 
     delta *= enc->direction;
 
-    enc->last_raw_count = raw_count;
-    enc->delta_count = delta;
-    enc->position_count += delta;
+    enc->last_counter = now;
+    enc->delta_ticks = delta;
+    enc->position_ticks += (int64_t)delta;
 
-    if (dt_s > 0.0f)
+    enc->position_rad =
+        ((float)enc->position_ticks / enc->ticks_per_rev) * ENCODER_TWO_PI;
+
+    if (dt_s <= 0.0f)
     {
-        enc->speed_cps = (float)delta / dt_s;
-
-        if (enc->counts_per_rev > 0U)
-        {
-            enc->speed_rps = enc->speed_cps / (float)enc->counts_per_rev;
-            enc->speed_rpm = enc->speed_rps * 60.0f;
-            enc->speed_rad_s = enc->speed_rps * ENCODER_TWO_PI;
-        }
-        else
-        {
-            enc->speed_rps = 0.0f;
-            enc->speed_rpm = 0.0f;
-            enc->speed_rad_s = 0.0f;
-        }
+        enc->raw_velocity_ticks_s = 0.0f;
+        enc->raw_velocity_rad_s = 0.0f;
+        enc->velocity_ticks_s = 0.0f;
+        enc->velocity_rad_s = 0.0f;
+        enc->velocity_filter_initialized = 0U;
+        return;
     }
+
+    /* Raw velocity from the latest encoder increment. */
+    enc->raw_velocity_ticks_s = (float)delta / dt_s;
+    enc->raw_velocity_rad_s =
+        (enc->raw_velocity_ticks_s / enc->ticks_per_rev) * ENCODER_TWO_PI;
+
+    /* Filter disabled. */
+    if (enc->velocity_filter_tau_s <= 0.0f)
+    {
+        enc->velocity_ticks_s = enc->raw_velocity_ticks_s;
+        enc->velocity_rad_s = enc->raw_velocity_rad_s;
+        enc->velocity_filter_initialized = 1U;
+        return;
+    }
+
+    /* Initialize filter at the first real measurement to avoid a fake ramp from zero. */
+    if (enc->velocity_filter_initialized == 0U)
+    {
+        enc->velocity_ticks_s = enc->raw_velocity_ticks_s;
+        enc->velocity_rad_s = enc->raw_velocity_rad_s;
+        enc->velocity_filter_initialized = 1U;
+        return;
+    }
+
+    const float alpha = dt_s / (enc->velocity_filter_tau_s + dt_s);
+
+    enc->velocity_ticks_s += alpha *
+        (enc->raw_velocity_ticks_s - enc->velocity_ticks_s);
+
+    enc->velocity_rad_s += alpha *
+        (enc->raw_velocity_rad_s - enc->velocity_rad_s);
 }
 
-int64_t Encoder_GetPositionCounts(const Encoder *enc)
+void Encoder_SetVelocityFilterTau(Encoder *enc, float tau_s)
 {
     if (enc == NULL)
-        return 0;
+    {
+        return;
+    }
 
-    return enc->position_count;
+    enc->velocity_filter_tau_s = (tau_s > 0.0f) ? tau_s : 0.0f;
+    enc->velocity_filter_initialized = 0U;
 }
 
-int32_t Encoder_GetDeltaCounts(const Encoder *enc)
+void Encoder_ResetVelocityFilter(Encoder *enc)
 {
     if (enc == NULL)
-        return 0;
+    {
+        return;
+    }
 
-    return enc->delta_count;
+    enc->velocity_ticks_s = enc->raw_velocity_ticks_s;
+    enc->velocity_rad_s = enc->raw_velocity_rad_s;
+    enc->velocity_filter_initialized = 1U;
 }
 
-float Encoder_GetSpeedCps(const Encoder *enc)
+int64_t Encoder_GetPositionTicks(const Encoder *enc)
 {
-    if (enc == NULL)
-        return 0.0f;
-
-    return enc->speed_cps;
+    return (enc != NULL) ? enc->position_ticks : 0;
 }
 
-float Encoder_GetSpeedRps(const Encoder *enc)
+int32_t Encoder_GetDeltaTicks(const Encoder *enc)
 {
-    if (enc == NULL)
-        return 0.0f;
-
-    return enc->speed_rps;
+    return (enc != NULL) ? enc->delta_ticks : 0;
 }
 
-float Encoder_GetSpeedRpm(const Encoder *enc)
+float Encoder_GetPositionRad(const Encoder *enc)
 {
-    if (enc == NULL)
-        return 0.0f;
-
-    return enc->speed_rpm;
+    return (enc != NULL) ? enc->position_rad : 0.0f;
 }
 
-float Encoder_GetSpeedRadS(const Encoder *enc)
+float Encoder_GetRawVelocityTicksPerSecond(const Encoder *enc)
 {
-    if (enc == NULL)
-        return 0.0f;
+    return (enc != NULL) ? enc->raw_velocity_ticks_s : 0.0f;
+}
 
-    return enc->speed_rad_s;
+float Encoder_GetRawVelocityRadPerSecond(const Encoder *enc)
+{
+    return (enc != NULL) ? enc->raw_velocity_rad_s : 0.0f;
+}
+
+float Encoder_GetVelocityTicksPerSecond(const Encoder *enc)
+{
+    return (enc != NULL) ? enc->velocity_ticks_s : 0.0f;
+}
+
+float Encoder_GetVelocityRadPerSecond(const Encoder *enc)
+{
+    return (enc != NULL) ? enc->velocity_rad_s : 0.0f;
 }
 
 uint32_t Encoder_GetRawCounter(const Encoder *enc)
 {
-    if (enc == NULL)
-        return 0;
-
-    return encoder_read_raw(enc);
+    return (enc != NULL) ? Encoder_ReadCounter(enc) : 0U;
 }

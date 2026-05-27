@@ -27,6 +27,7 @@
 #include "encoder.h"
 #include "neopixel.h"
 #include "imu.h"
+#include "velocity_pi.h"
 
 /* USER CODE END Includes */
 
@@ -446,6 +447,9 @@ NeoPixel neopixel;
 
 IMU imu;
 
+VelocityPI pi_left;
+VelocityPI pi_right;
+
 /* USER CODE END 0 */
 
 /**
@@ -510,17 +514,25 @@ int main(void)
 
   IR_ADC_DMA_Start();
 
-  Encoder_Init(&enc_left,
-               &htim2,
-               ENCODER_COUNTER_32BIT,
-               360,
-               -1);
+  Motor_Init(&motor_left);
+  Motor_Init(&motor_right);
 
-  Encoder_Init(&enc_right,
-               &htim4,
-               ENCODER_COUNTER_16BIT,
-               360,
-               1);
+  Encoder_Init(&enc_left,  &htim2, 360, -1, 0.01f);
+  Encoder_Init(&enc_right, &htim4, 360,  1, 0.01f);
+
+  VelocityPI_Init(&pi_left,
+                  11.5f,       // kp
+                  300.0f,      // ki
+                  0.01f,      // dt = 1 ms
+                  -1000.0f,
+                  1000.0f);
+
+  VelocityPI_Init(&pi_right,
+                  11.5f,       // kp
+                  300.0f,      // ki
+                  0.01f,      // dt = 1 ms
+                  -1000.0f,
+                  1000.0f);
 
   NeoPixel_Init(&neopixel, &htim8, TIM_CHANNEL_1);
 
@@ -529,7 +541,7 @@ int main(void)
 		  &hspi1,
 		  GPIOA,
 		  GPIO_PIN_4,
-		  IMU_GYRO_ODR_833_HZ_HIGH_PERF,
+		  IMU_GYRO_ODR_833_HZ,
 		  IMU_LPF1_ENABLED
   );
 
@@ -552,34 +564,47 @@ int main(void)
   NeoPixel_SetColor(&neopixel, COLOR_OFF);
   NeoPixel_Show(&neopixel);
 
-//  uint32_t last_tick = HAL_GetTick();
+  uint32_t last_tick = HAL_GetTick();
+
+  VelocityPI_SetSetpoint(&pi_left, 	0.0f);
+  VelocityPI_SetSetpoint(&pi_right, 0.0f);
+
+  uint32_t msg_cnt = 0;
+
   while (1)
   {
-//    uint32_t now = HAL_GetTick();
-//    if ((now - last_tick) >= 10)
-//    {
-//        float dt = (now - last_tick) / 1000.0f;
-//        last_tick = now;
-//
-//		Motor_Init(&motor_left);
-//		Motor_Init(&motor_right);
-//
-//		Motor_Brake(&motor_left);
-//		Motor_Brake(&motor_right);
-//
-//        Encoder_Update(&enc_left, dt);
-//        Encoder_Update(&enc_right, dt);
-//
-//        uint32_t rawCnt_l = Encoder_GetRawCounter(&enc_right);
-//
-//        printf("cnt_l %4u \r\n", rawCnt_l);
 
-        IMU_Update(&imu);
+    uint32_t now = HAL_GetTick();
+    if ((now - last_tick) >= 10)
+    {
+        float dt = (now - last_tick) / 1000.0f;
+        last_tick = now;
 
-        float gyro_z = IMU_GetGyroZRad(&imu);
-        printf("gyro z %4f \r\n", gyro_z);
+//		Motor_Set(&motor_left, 1000);
+//		Motor_Set(&motor_right, 1000);
 
-        HAL_Delay(50);
+	    Encoder_Update(&enc_left, dt);
+	    Encoder_Update(&enc_right, dt);
+
+	    float left_speed_rad = Encoder_GetRawVelocityRadPerSecond(&enc_left);
+	    float right_speed_rad = Encoder_GetRawVelocityRadPerSecond(&enc_right);
+
+        float left_cmd = VelocityPI_Update(&pi_left, left_speed_rad);
+        float right_cmd = VelocityPI_Update(&pi_right, right_speed_rad);
+
+        Motor_Set(&motor_left, (int16_t)left_cmd);
+        Motor_Set(&motor_right, (int16_t)right_cmd);
+
+		printf("vel_l: %.2f | vel_r: %.2f | ms = %d \r\n", left_speed_rad, right_speed_rad, msg_cnt * 10U);
+
+    }
+//
+//        IMU_Update(&imu);
+//
+//        float gyro_z = IMU_GetGyroZRad(&imu);
+//        printf("gyro z %4f \r\n", gyro_z);
+//
+//        HAL_Delay(50);
     }
 
 //

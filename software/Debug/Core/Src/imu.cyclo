@@ -3,7 +3,7 @@
 ../Core/Src/imu.c:20:13:IMU_WriteRegister	1
 ../Core/Src/imu.c:31:13:IMU_ReadRegisters	1
 ../Core/Src/imu.c:41:12:IMU_Init	6
-../Core/Src/imu.c:93:12:IMU_CalibrateGyro	4
-../Core/Src/imu.c:119:12:IMU_Update	2
-../Core/Src/imu.c:137:7:IMU_GetGyroZDeg	2
-../Core/Src/imu.c:145:7:IMU_GetGyroZRad	2
+../Core/Src/imu.c:96:12:IMU_CalibrateGyro	4
+../Core/Src/imu.c:122:12:IMU_Update	2
+../Core/Src/imu.c:140:7:IMU_GetGyroZDeg	2
+../Core/Src/imu.c:148:7:IMU_GetGyroZRad	2

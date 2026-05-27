@@ -1,0 +1,6 @@
+../Core/Src/velocity_pi.c:9:14:clamp_float	24	static
+../Core/Src/velocity_pi.c:20:6:VelocityPI_Init	32	static
+../Core/Src/velocity_pi.c:45:6:VelocityPI_Reset	16	static
+../Core/Src/velocity_pi.c:55:6:VelocityPI_SetGains	24	static
+../Core/Src/velocity_pi.c:64:6:VelocityPI_SetSetpoint	16	static
+../Core/Src/velocity_pi.c:72:7:VelocityPI_Update	24	static

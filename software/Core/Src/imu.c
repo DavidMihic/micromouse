@@ -74,6 +74,7 @@ IMU_Status IMU_Init(IMU *imu, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_port, ui
     {
     	// Set bit 1 (LPF1_SEL_G) to 1 to activate LPF1
         IMU_WriteRegister(imu, LSM6DSO32_REG_CTRL4_C, 0x02);
+        IMU_WriteRegister(imu, LSM6DSO32_REG_CTRL6_C, 0x02);
     }
     else
     {
@@ -84,6 +85,8 @@ IMU_Status IMU_Init(IMU *imu, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_port, ui
     // Config gyro: ODR (first 4 bits) + Full Scale at +-1000 dps (0x08
     uint8_t ctrl2_g_value = (uint8_t)imu->odr_mode | 0x08;
     IMU_WriteRegister(imu, LSM6DSO32_REG_CTRL2_G, ctrl2_g_value);
+
+    IMU_WriteRegister(imu, LSM6DSO32_REG_CTRL7_G, 0x00);
 
     HAL_Delay(50);
 
