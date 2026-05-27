@@ -145,4 +145,3 @@ void Motor_Coast(Motor *motor)
     set_pwm_percent_0(motor->htim_in1, motor->channel_in1);
     set_pwm_percent_0(motor->htim_in2, motor->channel_in2);
 }
-
