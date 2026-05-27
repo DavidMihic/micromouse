@@ -21,10 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <stdio.h>
-#include <stdlib.h>
-
-
+#include "motor.h"
+#include "encoder.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,46 +32,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define NEOPIXEL_TIMER        htim8
-#define NEOPIXEL_CHANNEL      TIM_CHANNEL_1
-
-#define NEOPIXEL_ARR          211
-
-#define WS2812_0              60
-#define WS2812_1              120
-
-#define NUM_LEDS              1
-#define BITS_PER_LED          24
-#define RESET_SLOTS           50
-
-#define LSM6DSO32_WHO_AM_I   0x0F
-
-#define LSM6_CTRL1_XL   0x10
-#define LSM6_CTRL2_G    0x11
-#define LSM6_CTRL3_C    0x12
-#define LSM6_OUTX_L_G   0x22
-
-#define IMU_CS_LOW()    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET)
-#define IMU_CS_HIGH()   HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET)
-
-#define ADC1_IR_COUNT  4
-#define ADC2_IR_COUNT  2
-
-#define MOTOR_PWM_MAX 1000
-
-#define L_IN1_CH   TIM_CHANNEL_1   // PA8
-#define L_IN2_CH   TIM_CHANNEL_2   // PA9
-#define R_IN1_CH   TIM_CHANNEL_3   // PA10
-#define R_IN2_CH   TIM_CHANNEL_4   // PA11
-
-#define IR_LED_1   0
-#define IR_LED_2   1
-#define IR_LED_3   2
-#define IR_LED_4   3
-#define IR_LED_5   4
-#define IR_LED_6   5
-
-#define IR_LED_MAX_PULSE_US  400U
 
 /* USER CODE END PD */
 
@@ -87,6 +45,12 @@ ADC_HandleTypeDef hadc1;
 ADC_HandleTypeDef hadc2;
 DMA_HandleTypeDef hdma_adc1;
 DMA_HandleTypeDef hdma_adc2;
+
+CORDIC_HandleTypeDef hcordic;
+
+CRC_HandleTypeDef hcrc;
+
+FMAC_HandleTypeDef hfmac;
 
 SPI_HandleTypeDef hspi1;
 
@@ -116,343 +80,39 @@ static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_CORDIC_Init(void);
+static void MX_CRC_Init(void);
+static void MX_FMAC_Init(void);
 /* USER CODE BEGIN PFP */
-static uint16_t pwmData[NUM_LEDS * BITS_PER_LED + RESET_SLOTS];
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t _button_state_1 = 0;
-uint8_t _button_state_2 = 0;
-
-uint8_t _dip_state_1 = 0;
-uint8_t _dip_state_2 = 0;
-uint8_t _dip_state_3 = 0;
-
-int16_t left_cnt = 0;
-int16_t right_cnt = 0;
-
-volatile uint16_t adc1_dma[ADC1_IR_COUNT];
-volatile uint16_t adc2_dma[ADC2_IR_COUNT];
-
-uint16_t ir_raw[6];
-
-volatile uint8_t adc1_dma_ready = 0;
-volatile uint8_t adc2_dma_ready = 0;
-// TIM1 channel mapping
-
-int __io_putchar(int ch)
+Motor motor_left =
 {
-    /* Place your implementation here.
-       e.g., write a character to the USART and loop until the end of transmission */
-    HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
-    return ch;
-}
+    .htim_in1 = &htim1,
+    .channel_in1 = TIM_CHANNEL_1,
 
-void motors_start_pwm(void)
+    .htim_in2 = &htim1,
+    .channel_in2 = TIM_CHANNEL_2,
+
+    .direction = 1
+};
+
+Motor motor_right =
 {
-    HAL_TIM_PWM_Start(&htim1, L_IN1_CH);
-    HAL_TIM_PWM_Start(&htim1, L_IN2_CH);
-    HAL_TIM_PWM_Start(&htim1, R_IN1_CH);
-    HAL_TIM_PWM_Start(&htim1, R_IN2_CH);
-}
+    .htim_in1 = &htim1,
+    .channel_in1 = TIM_CHANNEL_3,
 
-static int16_t clamp_cmd(int16_t value)
-{
-    if (value > MOTOR_PWM_MAX)  return MOTOR_PWM_MAX;
-    if (value < -MOTOR_PWM_MAX) return -MOTOR_PWM_MAX;
-    return value;
-}
+    .htim_in2 = &htim1,
+    .channel_in2 = TIM_CHANNEL_4,
 
-static void set_pwm_permille(uint32_t channel, uint16_t permille)
-{
-    if (permille > 1000)
-        permille = 1000;
+    .direction = 1
+};
 
-    uint32_t period = __HAL_TIM_GET_AUTORELOAD(&htim1) + 1;
-    uint32_t compare = ((uint32_t)permille * period) / 1000;
-
-    __HAL_TIM_SET_COMPARE(&htim1, channel, compare);
-}
-
-static void motor_set_one_brake_pwm(int16_t cmd, uint32_t ch_in1, uint32_t ch_in2)
-{
-    cmd = clamp_cmd(cmd);
-
-    if (cmd > 0)
-    {
-        // Forward:
-        // IN1 always high.
-        // IN2 high during brake, low during drive.
-        set_pwm_permille(ch_in1, 1000);
-        set_pwm_permille(ch_in2, 1000 - cmd);
-    }
-    else if (cmd < 0)
-    {
-        // Reverse:
-        // IN2 always high.
-        // IN1 high during brake, low during drive.
-        uint16_t mag = -cmd;
-
-        set_pwm_permille(ch_in1, 1000 - mag);
-        set_pwm_permille(ch_in2, 1000);
-    }
-    else
-    {
-        // Coast / sleep
-        set_pwm_permille(ch_in1, 0);
-        set_pwm_permille(ch_in2, 0);
-    }
-}
-
-void motors_set(int16_t left_cmd, int16_t right_cmd)
-{
-    motor_set_one_brake_pwm(left_cmd,  L_IN1_CH, L_IN2_CH);
-    motor_set_one_brake_pwm(right_cmd, R_IN1_CH, R_IN2_CH);
-}
-
-static void NeoPixel_SetPixel(uint8_t led, uint8_t r, uint8_t g, uint8_t b)
-{
-    uint32_t color;
-
-    // WS2812 expects GRB order, not RGB
-    color = ((uint32_t)g << 16) | ((uint32_t)r << 8) | b;
-
-    for (uint8_t bit = 0; bit < 24; bit++)
-    {
-        if (color & (1 << (23 - bit)))
-            pwmData[led * 24 + bit] = WS2812_1;
-        else
-            pwmData[led * 24 + bit] = WS2812_0;
-    }
-}
-
-void NeoPixel_Show(void)
-{
-    // Add reset low time
-    for (uint16_t i = NUM_LEDS * BITS_PER_LED; i < NUM_LEDS * BITS_PER_LED + RESET_SLOTS; i++)
-    {
-        pwmData[i] = 0;
-    }
-
-    HAL_TIM_PWM_Start_DMA(
-        &NEOPIXEL_TIMER,
-        NEOPIXEL_CHANNEL,
-        (uint32_t *)pwmData,
-        NUM_LEDS * BITS_PER_LED + RESET_SLOTS
-    );
-}
-
-void NeoPixel_SetColor(uint8_t r, uint8_t g, uint8_t b)
-{
-    NeoPixel_SetPixel(0, r, g, b);
-    NeoPixel_Show();
-}
-
-void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
-{
-    if (htim->Instance == TIM8)
-    {
-        HAL_TIM_PWM_Stop_DMA(&NEOPIXEL_TIMER, NEOPIXEL_CHANNEL);
-        __HAL_TIM_SET_COMPARE(&NEOPIXEL_TIMER, NEOPIXEL_CHANNEL, 0);
-    }
-}
-
-uint8_t IMU_ReadWhoAmI(void)
-{
-    uint8_t tx[2] = { LSM6DSO32_WHO_AM_I | 0x80, 0x00 };
-    uint8_t rx[2] = { 0 };
-
-    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET);
-
-    HAL_SPI_TransmitReceive(&hspi1, tx, rx, 2, HAL_MAX_DELAY);
-
-    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
-
-    return rx[1];
-}
-
-void IMU_WriteReg(uint8_t reg, uint8_t value)
-{
-    uint8_t tx[2];
-
-    tx[0] = reg & 0x7F;   // write command
-    tx[1] = value;
-
-    IMU_CS_LOW();
-    HAL_SPI_Transmit(&hspi1, tx, 2, HAL_MAX_DELAY);
-    IMU_CS_HIGH();
-}
-
-void IMU_ReadRegs(uint8_t reg, uint8_t *data, uint8_t len)
-{
-    uint8_t addr = reg | 0x80;   // read command
-
-    IMU_CS_LOW();
-    HAL_SPI_Transmit(&hspi1, &addr, 1, HAL_MAX_DELAY);
-    HAL_SPI_Receive(&hspi1, data, len, HAL_MAX_DELAY);
-    IMU_CS_HIGH();
-}
-
-void IMU_InitSimple(void)
-{
-    /*
-     * CTRL3_C = 0x44
-     * BDU = 1, IF_INC = 1
-     */
-    IMU_WriteReg(LSM6_CTRL3_C, 0x44);
-
-    /*
-     * CTRL1_XL = 0x60
-     * Accelerometer ON, 416 Hz, ±4 g
-     */
-    IMU_WriteReg(LSM6_CTRL1_XL, 0x60);
-
-    /*
-     * CTRL2_G = 0x60
-     * Gyroscope ON, 416 Hz, ±250 dps
-     */
-    IMU_WriteReg(LSM6_CTRL2_G, 0x60);
-
-    HAL_Delay(50);
-}
-
-void IMU_ReadRaw(int16_t *gx, int16_t *gy, int16_t *gz,
-                 int16_t *ax, int16_t *ay, int16_t *az)
-{
-    uint8_t data[12];
-
-    IMU_ReadRegs(LSM6_OUTX_L_G, data, 12);
-
-    *gx = (int16_t)((data[1]  << 8) | data[0]);
-    *gy = (int16_t)((data[3]  << 8) | data[2]);
-    *gz = (int16_t)((data[5]  << 8) | data[4]);
-
-    *ax = (int16_t)((data[7]  << 8) | data[6]);
-    *ay = (int16_t)((data[9]  << 8) | data[8]);
-    *az = (int16_t)((data[11] << 8) | data[10]);
-}
-
-static void IR_Demux_Disable(void)
-{
-    // SN74AHC238 selected output is active only when enable is active.
-    // In your schematic, DMUX_EN goes to the active-high enable pin.
-    HAL_GPIO_WritePin(DMUX_EN_GPIO_Port, DMUX_EN_Pin, GPIO_PIN_RESET);
-}
-
-static void IR_Demux_Enable(void)
-{
-    HAL_GPIO_WritePin(DMUX_EN_GPIO_Port, DMUX_EN_Pin, GPIO_PIN_SET);
-}
-
-static void IR_Demux_Select(uint8_t led)
-{
-    // led = 0 selects IR_EM_1
-    // led = 1 selects IR_EM_2
-    // ...
-    // led = 5 selects IR_EM_6
-
-    HAL_GPIO_WritePin(DMUX_A0_GPIO_Port, DMUX_A0_Pin,
-                      (led & 0x01) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-
-    HAL_GPIO_WritePin(DMUX_A1_GPIO_Port, DMUX_A1_Pin,
-                      (led & 0x02) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-
-    HAL_GPIO_WritePin(DMUX_A2_GPIO_Port, DMUX_A2_Pin,
-                      (led & 0x04) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-}
-
-static void IR_LED_On(uint8_t led)
-{
-    IR_Demux_Disable();      // avoid glitches while changing address
-    IR_Demux_Select(led);
-    IR_Demux_Enable();
-}
-
-static void IR_LED_Off(void)
-{
-    IR_Demux_Disable();
-}
-
-static void DWT_Delay_Init(void)
-{
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;  // Enable DWT access
-    DWT->CYCCNT = 0;                                 // Reset cycle counter
-    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;             // Enable cycle counter
-}
-
-static void delay_us(uint32_t us)
-{
-    uint32_t start = DWT->CYCCNT;
-    uint32_t cycles = (SystemCoreClock / 1000000U) * us;
-
-    while ((uint32_t)(DWT->CYCCNT - start) < cycles)
-    {
-        // wait
-    }
-}
-
-static void IR_LED_Pulse_us(uint8_t led, uint32_t pulse_us)
-{
-    if (pulse_us > IR_LED_MAX_PULSE_US)
-    {
-        pulse_us = IR_LED_MAX_PULSE_US;  // safety limit for your SFH4545 pulse
-    }
-
-    IR_LED_On(led);
-    delay_us(pulse_us);
-    IR_LED_Off();
-}
-
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
-{
-    if (hadc->Instance == ADC1)
-    {
-        adc1_dma_ready = 1;
-    }
-    else if (hadc->Instance == ADC2)
-    {
-        adc2_dma_ready = 1;
-    }
-}
-
-static void IR_ADC_DMA_Start(void)
-{
-    // Optional but recommended on STM32G4
-    if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
-    {
-        Error_Handler();
-    }
-
-    if (HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED) != HAL_OK)
-    {
-        Error_Handler();
-    }
-
-    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc1_dma, ADC1_IR_COUNT) != HAL_OK)
-    {
-        Error_Handler();
-    }
-
-    if (HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc2_dma, ADC2_IR_COUNT) != HAL_OK)
-    {
-        Error_Handler();
-    }
-}
-
-static void IR_ADC_UpdateRawValues(void)
-{
-// Raw data is inverted
-    ir_raw[0] = 4095 - adc2_dma[0];   // IR_REC_1
-    ir_raw[1] = 4095 - adc1_dma[0];   // IR_REC_2
-    ir_raw[2] = 4095 - adc1_dma[1];   // IR_REC_3
-    ir_raw[3] = 4095 - adc1_dma[2];   // IR_REC_4
-    ir_raw[4] = 4095 - adc1_dma[3];   // IR_REC_5
-    ir_raw[5] = 4095 - adc2_dma[1];   // IR_REC_6
-}
-
-
+Encoder encoder_left;
+Encoder encoder_right;
 /* USER CODE END 0 */
 
 /**
@@ -493,82 +153,17 @@ int main(void)
   MX_TIM4_Init();
   MX_TIM8_Init();
   MX_USART2_UART_Init();
+  MX_CORDIC_Init();
+  MX_CRC_Init();
+  MX_FMAC_Init();
   /* USER CODE BEGIN 2 */
-
-  HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);   // Left encoder
-  HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL);   // Right encoder
-
-  __HAL_TIM_SET_COUNTER(&htim2, 0);
-  __HAL_TIM_SET_COUNTER(&htim4, 0);
-
-  motors_start_pwm();
-
-  int16_t gx, gy, gz;
-  int16_t ax, ay, az;
-
-  HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
-  HAL_Delay(100);
-
-  IMU_InitSimple();
-
-  DWT_Delay_Init();
-
-  IR_LED_Off();
-
-  IR_ADC_DMA_Start();
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
- /*
-  * ADC1 CH1 - IR5
-  *
-  */
-  int16_t left_prev = 0;
-  int16_t right_prev = 0;
   while (1)
   {
-
-	  	motors_set(-0, 0);
-
-		int16_t left_now  = (int16_t)__HAL_TIM_GET_COUNTER(&htim2);
-		int16_t right_now = (int16_t)__HAL_TIM_GET_COUNTER(&htim4);
-
-		int16_t left_delta  = left_now  - left_prev;
-		int16_t right_delta = right_now - right_prev;
-
-		left_prev = left_now;
-		right_prev = right_now;
-
-		printf("L: %6d  dL: %6d | R: %6d  dR: %6d\r\n",
-			 left_now, left_delta,
-			 right_now, right_delta);
-
-		HAL_Delay(100);
-
-//
-//	IR_LED_Pulse_us(IR_LED_5, 100);
-//
-//	if (adc1_dma_ready && adc2_dma_ready)
-//	{
-//		adc1_dma_ready = 0;
-//		adc2_dma_ready = 0;
-//
-//		IR_ADC_UpdateRawValues();
-//
-//		printf("IR: %4u %4u %4u %4u %4u %4u\r\n",
-//			   ir_raw[0],
-//			   ir_raw[1],
-//			   ir_raw[2],
-//			   ir_raw[3],
-//			   ir_raw[4],
-//			   ir_raw[5]);
-//	}
-//
-//	HAL_Delay(40);
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -781,6 +376,89 @@ static void MX_ADC2_Init(void)
   /* USER CODE BEGIN ADC2_Init 2 */
 
   /* USER CODE END ADC2_Init 2 */
+
+}
+
+/**
+  * @brief CORDIC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CORDIC_Init(void)
+{
+
+  /* USER CODE BEGIN CORDIC_Init 0 */
+
+  /* USER CODE END CORDIC_Init 0 */
+
+  /* USER CODE BEGIN CORDIC_Init 1 */
+
+  /* USER CODE END CORDIC_Init 1 */
+  hcordic.Instance = CORDIC;
+  if (HAL_CORDIC_Init(&hcordic) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CORDIC_Init 2 */
+
+  /* USER CODE END CORDIC_Init 2 */
+
+}
+
+/**
+  * @brief CRC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_CRC_Init(void)
+{
+
+  /* USER CODE BEGIN CRC_Init 0 */
+
+  /* USER CODE END CRC_Init 0 */
+
+  /* USER CODE BEGIN CRC_Init 1 */
+
+  /* USER CODE END CRC_Init 1 */
+  hcrc.Instance = CRC;
+  hcrc.Init.DefaultPolynomialUse = DEFAULT_POLYNOMIAL_ENABLE;
+  hcrc.Init.DefaultInitValueUse = DEFAULT_INIT_VALUE_ENABLE;
+  hcrc.Init.InputDataInversionMode = CRC_INPUTDATA_INVERSION_NONE;
+  hcrc.Init.OutputDataInversionMode = CRC_OUTPUTDATA_INVERSION_DISABLE;
+  hcrc.InputDataFormat = CRC_INPUTDATA_FORMAT_BYTES;
+  if (HAL_CRC_Init(&hcrc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN CRC_Init 2 */
+
+  /* USER CODE END CRC_Init 2 */
+
+}
+
+/**
+  * @brief FMAC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_FMAC_Init(void)
+{
+
+  /* USER CODE BEGIN FMAC_Init 0 */
+
+  /* USER CODE END FMAC_Init 0 */
+
+  /* USER CODE BEGIN FMAC_Init 1 */
+
+  /* USER CODE END FMAC_Init 1 */
+  hfmac.Instance = FMAC;
+  if (HAL_FMAC_Init(&hfmac) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN FMAC_Init 2 */
+
+  /* USER CODE END FMAC_Init 2 */
 
 }
 

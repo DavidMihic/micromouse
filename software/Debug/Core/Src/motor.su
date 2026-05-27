@@ -1,0 +1,9 @@
+../Core/Src/motor.c:10:16:clamp_command	16	static
+../Core/Src/motor.c:21:17:get_pwm_top	16	static
+../Core/Src/motor.c:26:13:set_pwm_scaled	32	static
+../Core/Src/motor.c:38:13:set_pwm_percent_100	24	static
+../Core/Src/motor.c:43:13:set_pwm_percent_0	16	static
+../Core/Src/motor.c:48:14:Motor_Init	16	static
+../Core/Src/motor.c:70:6:Motor_Set	24	static
+../Core/Src/motor.c:124:6:Motor_Brake	16	static
+../Core/Src/motor.c:136:6:Motor_Coast	16	static
