@@ -23,7 +23,8 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <stdlib.h>
-
+#include "motor.h"
+#include "encoder.h"
 
 /* USER CODE END Includes */
 
@@ -452,6 +453,30 @@ static void IR_ADC_UpdateRawValues(void)
     ir_raw[5] = 4095 - adc2_dma[1];   // IR_REC_6
 }
 
+Motor motor_left =
+{
+    .htim_in1 = &htim1,
+    .channel_in1 = TIM_CHANNEL_1,
+
+    .htim_in2 = &htim1,
+    .channel_in2 = TIM_CHANNEL_2,
+
+    .direction = -1
+};
+
+Motor motor_right =
+{
+    .htim_in1 = &htim1,
+    .channel_in1 = TIM_CHANNEL_3,
+
+    .htim_in2 = &htim1,
+    .channel_in2 = TIM_CHANNEL_4,
+
+    .direction = 1
+};
+
+Encoder enc_left;
+Encoder enc_right;
 
 /* USER CODE END 0 */
 
@@ -517,6 +542,18 @@ int main(void)
 
   IR_ADC_DMA_Start();
 
+  Encoder_Init(&enc_left,
+               &htim2,
+               ENCODER_COUNTER_32BIT,
+               360,
+               -1);
+
+  Encoder_Init(&enc_right,
+               &htim4,
+               ENCODER_COUNTER_16BIT,
+               360,
+               1);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -526,27 +563,29 @@ int main(void)
   * ADC1 CH1 - IR5
   *
   */
-  int16_t left_prev = 0;
-  int16_t right_prev = 0;
+  uint32_t last_tick = HAL_GetTick();
   while (1)
   {
+    uint32_t now = HAL_GetTick();
+    if ((now - last_tick) >= 10)
+    {
+        float dt = (now - last_tick) / 1000.0f;
+        last_tick = now;
 
-	  	motors_set(-0, 0);
+		Motor_Init(&motor_left);
+		Motor_Init(&motor_right);
 
-		int16_t left_now  = (int16_t)__HAL_TIM_GET_COUNTER(&htim2);
-		int16_t right_now = (int16_t)__HAL_TIM_GET_COUNTER(&htim4);
+		Motor_Brake(&motor_left);
+		Motor_Brake(&motor_right);
 
-		int16_t left_delta  = left_now  - left_prev;
-		int16_t right_delta = right_now - right_prev;
+        Encoder_Update(&enc_left, dt);
+        Encoder_Update(&enc_right, dt);
 
-		left_prev = left_now;
-		right_prev = right_now;
+        uint32_t rawCnt_l = Encoder_GetRawCounter(&enc_right);
 
-		printf("L: %6d  dL: %6d | R: %6d  dR: %6d\r\n",
-			 left_now, left_delta,
-			 right_now, right_delta);
+        printf("cnt_l %4u \r\n", rawCnt_l);
 
-		HAL_Delay(100);
+    }
 
 //
 //	IR_LED_Pulse_us(IR_LED_5, 100);
