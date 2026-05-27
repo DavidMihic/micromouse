@@ -26,6 +26,7 @@
 #include "motor.h"
 #include "encoder.h"
 #include "neopixel.h"
+#include "imu.h"
 
 /* USER CODE END Includes */
 
@@ -222,81 +223,81 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
         __HAL_TIM_SET_COMPARE(&NEOPIXEL_TIMER, NEOPIXEL_CHANNEL, 0);
     }
 }
-
-uint8_t IMU_ReadWhoAmI(void)
-{
-    uint8_t tx[2] = { LSM6DSO32_WHO_AM_I | 0x80, 0x00 };
-    uint8_t rx[2] = { 0 };
-
-    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET);
-
-    HAL_SPI_TransmitReceive(&hspi1, tx, rx, 2, HAL_MAX_DELAY);
-
-    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
-
-    return rx[1];
-}
-
-void IMU_WriteReg(uint8_t reg, uint8_t value)
-{
-    uint8_t tx[2];
-
-    tx[0] = reg & 0x7F;   // write command
-    tx[1] = value;
-
-    IMU_CS_LOW();
-    HAL_SPI_Transmit(&hspi1, tx, 2, HAL_MAX_DELAY);
-    IMU_CS_HIGH();
-}
-
-void IMU_ReadRegs(uint8_t reg, uint8_t *data, uint8_t len)
-{
-    uint8_t addr = reg | 0x80;   // read command
-
-    IMU_CS_LOW();
-    HAL_SPI_Transmit(&hspi1, &addr, 1, HAL_MAX_DELAY);
-    HAL_SPI_Receive(&hspi1, data, len, HAL_MAX_DELAY);
-    IMU_CS_HIGH();
-}
-
-void IMU_InitSimple(void)
-{
-    /*
-     * CTRL3_C = 0x44
-     * BDU = 1, IF_INC = 1
-     */
-    IMU_WriteReg(LSM6_CTRL3_C, 0x44);
-
-    /*
-     * CTRL1_XL = 0x60
-     * Accelerometer ON, 416 Hz, ±4 g
-     */
-    IMU_WriteReg(LSM6_CTRL1_XL, 0x60);
-
-    /*
-     * CTRL2_G = 0x60
-     * Gyroscope ON, 416 Hz, ±250 dps
-     */
-    IMU_WriteReg(LSM6_CTRL2_G, 0x60);
-
-    HAL_Delay(50);
-}
-
-void IMU_ReadRaw(int16_t *gx, int16_t *gy, int16_t *gz,
-                 int16_t *ax, int16_t *ay, int16_t *az)
-{
-    uint8_t data[12];
-
-    IMU_ReadRegs(LSM6_OUTX_L_G, data, 12);
-
-    *gx = (int16_t)((data[1]  << 8) | data[0]);
-    *gy = (int16_t)((data[3]  << 8) | data[2]);
-    *gz = (int16_t)((data[5]  << 8) | data[4]);
-
-    *ax = (int16_t)((data[7]  << 8) | data[6]);
-    *ay = (int16_t)((data[9]  << 8) | data[8]);
-    *az = (int16_t)((data[11] << 8) | data[10]);
-}
+//
+//uint8_t IMU_ReadWhoAmI(void)
+//{
+//    uint8_t tx[2] = { LSM6DSO32_WHO_AM_I | 0x80, 0x00 };
+//    uint8_t rx[2] = { 0 };
+//
+//    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET);
+//
+//    HAL_SPI_TransmitReceive(&hspi1, tx, rx, 2, HAL_MAX_DELAY);
+//
+//    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
+//
+//    return rx[1];
+//}
+//
+//void IMU_WriteReg(uint8_t reg, uint8_t value)
+//{
+//    uint8_t tx[2];
+//
+//    tx[0] = reg & 0x7F;   // write command
+//    tx[1] = value;
+//
+//    IMU_CS_LOW();
+//    HAL_SPI_Transmit(&hspi1, tx, 2, HAL_MAX_DELAY);
+//    IMU_CS_HIGH();
+//}
+//
+//void IMU_ReadRegs(uint8_t reg, uint8_t *data, uint8_t len)
+//{
+//    uint8_t addr = reg | 0x80;   // read command
+//
+//    IMU_CS_LOW();
+//    HAL_SPI_Transmit(&hspi1, &addr, 1, HAL_MAX_DELAY);
+//    HAL_SPI_Receive(&hspi1, data, len, HAL_MAX_DELAY);
+//    IMU_CS_HIGH();
+//}
+//
+//void IMU_InitSimple(void)
+//{
+//    /*
+//     * CTRL3_C = 0x44
+//     * BDU = 1, IF_INC = 1
+//     */
+//    IMU_WriteReg(LSM6_CTRL3_C, 0x44);
+//
+//    /*
+//     * CTRL1_XL = 0x60
+//     * Accelerometer ON, 416 Hz, ±4 g
+//     */
+//    IMU_WriteReg(LSM6_CTRL1_XL, 0x60);
+//
+//    /*
+//     * CTRL2_G = 0x60
+//     * Gyroscope ON, 416 Hz, ±250 dps
+//     */
+//    IMU_WriteReg(LSM6_CTRL2_G, 0x60);
+//
+//    HAL_Delay(50);
+//}
+//
+//void IMU_ReadRaw(int16_t *gx, int16_t *gy, int16_t *gz,
+//                 int16_t *ax, int16_t *ay, int16_t *az)
+//{
+//    uint8_t data[12];
+//
+//    IMU_ReadRegs(LSM6_OUTX_L_G, data, 12);
+//
+//    *gx = (int16_t)((data[1]  << 8) | data[0]);
+//    *gy = (int16_t)((data[3]  << 8) | data[2]);
+//    *gz = (int16_t)((data[5]  << 8) | data[4]);
+//
+//    *ax = (int16_t)((data[7]  << 8) | data[6]);
+//    *ay = (int16_t)((data[9]  << 8) | data[8]);
+//    *az = (int16_t)((data[11] << 8) | data[10]);
+//}
 
 static void IR_Demux_Disable(void)
 {
@@ -443,6 +444,8 @@ Encoder enc_right;
 
 NeoPixel neopixel;
 
+IMU imu;
+
 /* USER CODE END 0 */
 
 /**
@@ -499,7 +502,7 @@ int main(void)
   HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
   HAL_Delay(100);
 
-  IMU_InitSimple();
+//  IMU_InitSimple();
 
   DWT_Delay_Init();
 
@@ -521,6 +524,21 @@ int main(void)
 
   NeoPixel_Init(&neopixel, &htim8, TIM_CHANNEL_1);
 
+  IMU_Status status = IMU_Init(
+		  &imu,
+		  &hspi1,
+		  GPIOA,
+		  GPIO_PIN_4,
+		  IMU_GYRO_ODR_833_HZ_HIGH_PERF,
+		  IMU_LPF1_ENABLED
+  );
+
+  if (status == IMU_OK) {
+	  IMU_CalibrateGyro(&imu, 500);
+  } else {
+
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -534,28 +552,34 @@ int main(void)
   NeoPixel_SetColor(&neopixel, COLOR_OFF);
   NeoPixel_Show(&neopixel);
 
-  uint32_t last_tick = HAL_GetTick();
+//  uint32_t last_tick = HAL_GetTick();
   while (1)
   {
-    uint32_t now = HAL_GetTick();
-    if ((now - last_tick) >= 10)
-    {
-        float dt = (now - last_tick) / 1000.0f;
-        last_tick = now;
+//    uint32_t now = HAL_GetTick();
+//    if ((now - last_tick) >= 10)
+//    {
+//        float dt = (now - last_tick) / 1000.0f;
+//        last_tick = now;
+//
+//		Motor_Init(&motor_left);
+//		Motor_Init(&motor_right);
+//
+//		Motor_Brake(&motor_left);
+//		Motor_Brake(&motor_right);
+//
+//        Encoder_Update(&enc_left, dt);
+//        Encoder_Update(&enc_right, dt);
+//
+//        uint32_t rawCnt_l = Encoder_GetRawCounter(&enc_right);
+//
+//        printf("cnt_l %4u \r\n", rawCnt_l);
 
-		Motor_Init(&motor_left);
-		Motor_Init(&motor_right);
+        IMU_Update(&imu);
 
-		Motor_Brake(&motor_left);
-		Motor_Brake(&motor_right);
+        float gyro_z = IMU_GetGyroZRad(&imu);
+        printf("gyro z %4f \r\n", gyro_z);
 
-        Encoder_Update(&enc_left, dt);
-        Encoder_Update(&enc_right, dt);
-
-        uint32_t rawCnt_l = Encoder_GetRawCounter(&enc_right);
-
-        printf("cnt_l %4u \r\n", rawCnt_l);
-
+        HAL_Delay(50);
     }
 
 //
@@ -582,7 +606,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+//  }
   /* USER CODE END 3 */
 }
 
