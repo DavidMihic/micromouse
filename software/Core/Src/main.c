@@ -453,25 +453,39 @@ int main(void)
 		  IMU_LPF1_ENABLED
   );
 
-  if (status == IMU_OK) {
-	  IMU_CalibrateGyro(&imu, 500);
-  } else {
-
-  }
-
   RobotController_Init(&robot,
                          &motor_left, &motor_right,
                          &enc_left,   &enc_right,
                          &pi_left,    &pi_right);
+
+  HAL_Delay(500);
+
+//  IMU Calibration
+  NeoPixel_SetColor(&neopixel, COLOR_GREEN);
+  NeoPixel_Show(&neopixel);
+
+  if (status == IMU_OK) {
+	  IMU_CalibrateGyro(&imu, 1000);
+  } else {
+
+  }
+
+  NeoPixel_SetColor(&neopixel, COLOR_OFF);
+  NeoPixel_Show(&neopixel);
+
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
+  float error_sum = 0;
+
   while (1)
   {
-	  printf("gyro_z = %.6f rad/s\r\n", IMU_GetGyroZRad(&imu));
+	  float z = IMU_GetGyroZDeg(&imu);
+	  error_sum += z * 0.05;
+	  printf("error sum: %.6f \r\n", z);
 	  HAL_Delay(50);
   }
     /* USER CODE END WHILE */
