@@ -161,7 +161,8 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM8)
     {
-
+		extern NeoPixel neopixel;
+		NeoPixel_DMA_Callback(&neopixel, htim);
     }
 }
 
@@ -381,40 +382,39 @@ int main(void)
   NeoPixel_SetColor(&neopixel, COLOR_OFF);
   NeoPixel_Show(&neopixel);
 
-  uint32_t last_tick = HAL_GetTick();
-
-  VelocityPI_SetSetpoint(&pi_left, 	0.0f);
-  VelocityPI_SetSetpoint(&pi_right, 0.0f);
-
-  uint32_t msg_cnt = 0;
+//  uint32_t last_tick = HAL_GetTick();
+//
+//  VelocityPI_SetSetpoint(&pi_left, 	0.0f);
+//  VelocityPI_SetSetpoint(&pi_right, 0.0f);
+//
+//  uint32_t msg_cnt = 0;
 
   while (1)
   {
-
-    uint32_t now = HAL_GetTick();
-    if ((now - last_tick) >= 10)
-    {
-        float dt = (now - last_tick) / 1000.0f;
-        last_tick = now;
-
-	    Encoder_Update(&enc_left, dt);
-	    Encoder_Update(&enc_right, dt);
-
-//	    Using non filtered velocity because filtering creates a delay in the control loop
-	    float left_speed_rad = Encoder_GetRawVelocityRadPerSecond(&enc_left);
-	    float right_speed_rad = Encoder_GetRawVelocityRadPerSecond(&enc_right);
-
-        float left_cmd = VelocityPI_Update(&pi_left, left_speed_rad);
-        float right_cmd = VelocityPI_Update(&pi_right, right_speed_rad);
-
-        Motor_Set(&motor_left, (int16_t)left_cmd);
-        Motor_Set(&motor_right, (int16_t)right_cmd);
-
-        if (msg_cnt % 3 == 0)
-        	printf("filt_vel_l: %.2f | filt_vel_r: %.2f | ms = %u \r\n", Encoder_GetVelocityRadPerSecond(&enc_left), Encoder_GetVelocityRadPerSecond(&enc_right), msg_cnt * 10U);
-		msg_cnt++;
-
-    }
+//    uint32_t now = HAL_GetTick();
+//    if ((now - last_tick) >= 10)
+//    {
+//        float dt = (now - last_tick) / 1000.0f;
+//        last_tick = now;
+//
+//	    Encoder_Update(&enc_left, dt);
+//	    Encoder_Update(&enc_right, dt);
+//
+////	    Using non filtered velocity because filtering creates a delay in the control loop
+//	    float left_speed_rad = Encoder_GetRawVelocityRadPerSecond(&enc_left);
+//	    float right_speed_rad = Encoder_GetRawVelocityRadPerSecond(&enc_right);
+//
+//        float left_cmd = VelocityPI_Update(&pi_left, left_speed_rad);
+//        float right_cmd = VelocityPI_Update(&pi_right, right_speed_rad);
+//
+//        Motor_Set(&motor_left, (int16_t)left_cmd);
+//        Motor_Set(&motor_right, (int16_t)right_cmd);
+//
+//        if (msg_cnt % 3 == 0)
+//        	printf("filt_vel_l: %.2f | filt_vel_r: %.2f | ms = %u \r\n", Encoder_GetVelocityRadPerSecond(&enc_left), Encoder_GetVelocityRadPerSecond(&enc_right), msg_cnt * 10U);
+//		msg_cnt++;
+//
+//    }
 //
 //        IMU_Update(&imu);
 //
@@ -422,7 +422,7 @@ int main(void)
 //        printf("gyro z %4f \r\n", gyro_z);
 //
 //        HAL_Delay(50);
-    }
+  }
 
 //
 //	IR_LED_Pulse_us(IR_LED_5, 100);

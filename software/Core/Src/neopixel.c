@@ -9,8 +9,8 @@
 #include <string.h>
 
 const NeoPixel_Color COLOR_OFF         = { .red = 0,   .green = 0,   .blue = 0 };
-const NeoPixel_Color COLOR_RED 		 = { .red = 100, .green = 0,   .blue = 60 };
-const NeoPixel_Color COLOR_GREEN       = { .red = 0,   .green = 100, .blue = 60 };
+const NeoPixel_Color COLOR_RED 		 = { .red = 100, .green = 0,   .blue = 0 };
+const NeoPixel_Color COLOR_GREEN       = { .red = 0,   .green = 100, .blue = 0 };
 const NeoPixel_Color COLOR_BLUE        = { .red = 0,   .green = 0,   .blue = 100 };
 const NeoPixel_Color COLOR_YELLOW      = { .red = 100, .green = 100, .blue = 0 };
 const NeoPixel_Color COLOR_ORANGE      = { .red = 80,  .green = 20,  .blue = 0 };
@@ -129,6 +129,7 @@ void NeoPixel_DMA_Callback(NeoPixel *pixel, TIM_HandleTypeDef *htim)
     if (htim == pixel->htim)
     {
         HAL_TIM_PWM_Stop_DMA(pixel->htim, pixel->channel);
+        __HAL_TIM_SET_COMPARE(pixel->htim, pixel->channel, 0);
         pixel->is_transferring = 0;
     }
 }
