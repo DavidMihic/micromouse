@@ -17,6 +17,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <ir_array.h>
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -30,6 +31,7 @@
 #include "velocity_pi.h"
 #include "button.h"
 #include "robot_controller.h"
+#include "ir_sensors.h"
 
 /* USER CODE END Includes */
 
@@ -40,20 +42,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
-
-#define ADC1_IR_COUNT  4
-#define ADC2_IR_COUNT  2
-
-
-#define IR_LED_1   0
-#define IR_LED_2   1
-#define IR_LED_3   2
-#define IR_LED_4   3
-#define IR_LED_5   4
-#define IR_LED_6   5
-
-#define IR_LED_MAX_PULSE_US  400U
 
 /* USER CODE END PD */
 
@@ -77,6 +65,7 @@ TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
 TIM_HandleTypeDef htim8;
+TIM_HandleTypeDef htim16;
 DMA_HandleTypeDef hdma_tim8_ch1;
 
 UART_HandleTypeDef huart2;
@@ -96,34 +85,18 @@ static void MX_ADC2_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
-static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
-static void MX_TIM6_Init(void);
-static void MX_TIM7_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM7_Init(void);
+static void MX_TIM6_Init(void);
+static void MX_TIM3_Init(void);
+static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint8_t _button_state_1 = 0;
-uint8_t _button_state_2 = 0;
-
-uint8_t _dip_state_1 = 0;
-uint8_t _dip_state_2 = 0;
-uint8_t _dip_state_3 = 0;
-
-int16_t left_cnt = 0;
-int16_t right_cnt = 0;
-
-volatile uint16_t adc1_dma[ADC1_IR_COUNT];
-volatile uint16_t adc2_dma[ADC2_IR_COUNT];
-
-uint16_t ir_raw[6];
-
-volatile uint8_t adc1_dma_ready = 0;
-volatile uint8_t adc2_dma_ready = 0;
 
 Motor motor_left =
 {
@@ -161,6 +134,15 @@ float dt;
 Button btn1;
 Button btn2;
 DipSwitch dip_sw;
+
+IR_DemuxPins_t ir_demux = {
+    .a0 = {DMUX_A0_GPIO_Port, DMUX_A0_Pin},
+    .a1 = {DMUX_A1_GPIO_Port, DMUX_A1_Pin},
+    .a2 = {DMUX_A2_GPIO_Port, DMUX_A2_Pin},
+    .en = {DMUX_EN_GPIO_Port, DMUX_EN_Pin},
+
+    .en_active_high = true,
+};
 
 RobotController robot;
 
@@ -228,129 +210,131 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	{
 //		updateVelocityLoop();
 		RobotController_Update(&robot, dt);
+
+        if (!IR_Sensors_IsBusy() && !IR_Sensors_FrameReady())
+        {
+            IR_Sensors_StartFrame();
+        }
 	}
 
     if (htim->Instance == TIM7)
 		Button_TIM_PeriodElapsedCallback(htim);
+
+    if (htim->Instance == TIM16)
+    	IR_Sensors_OnTimerElapsed(htim);
+
 }
 
-static void IR_Demux_Disable(void)
-{
-    // SN74AHC238 selected output is active only when enable is active.
-    // In your schematic, DMUX_EN goes to the active-high enable pin.
-    HAL_GPIO_WritePin(DMUX_EN_GPIO_Port, DMUX_EN_Pin, GPIO_PIN_RESET);
-}
-
-static void IR_Demux_Enable(void)
-{
-    HAL_GPIO_WritePin(DMUX_EN_GPIO_Port, DMUX_EN_Pin, GPIO_PIN_SET);
-}
-
-static void IR_Demux_Select(uint8_t led)
-{
-    // led = 0 selects IR_EM_1
-    // led = 1 selects IR_EM_2
-    // ...
-    // led = 5 selects IR_EM_6
-
-    HAL_GPIO_WritePin(DMUX_A0_GPIO_Port, DMUX_A0_Pin,
-                      (led & 0x01) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-
-    HAL_GPIO_WritePin(DMUX_A1_GPIO_Port, DMUX_A1_Pin,
-                      (led & 0x02) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-
-    HAL_GPIO_WritePin(DMUX_A2_GPIO_Port, DMUX_A2_Pin,
-                      (led & 0x04) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-}
-
-static void IR_LED_On(uint8_t led)
-{
-    IR_Demux_Disable();      // avoid glitches while changing address
-    IR_Demux_Select(led);
-    IR_Demux_Enable();
-}
-
-static void IR_LED_Off(void)
-{
-    IR_Demux_Disable();
-}
-
-static void DWT_Delay_Init(void)
-{
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;  // Enable DWT access
-    DWT->CYCCNT = 0;                                 // Reset cycle counter
-    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;             // Enable cycle counter
-}
-
-static void delay_us(uint32_t us)
-{
-    uint32_t start = DWT->CYCCNT;
-    uint32_t cycles = (SystemCoreClock / 1000000U) * us;
-
-    while ((uint32_t)(DWT->CYCCNT - start) < cycles)
-    {
-        // wait
-    }
-}
-
-static void IR_LED_Pulse_us(uint8_t led, uint32_t pulse_us)
-{
-    if (pulse_us > IR_LED_MAX_PULSE_US)
-    {
-        pulse_us = IR_LED_MAX_PULSE_US;  // safety limit for your SFH4545 pulse
-    }
-
-    IR_LED_On(led);
-    delay_us(pulse_us);
-    IR_LED_Off();
-}
+//static void IR_Demux_Disable(void)
+//{
+//    // SN74AHC238 selected output is active only when enable is active.
+//    // In your schematic, DMUX_EN goes to the active-high enable pin.
+//    HAL_GPIO_WritePin(DMUX_EN_GPIO_Port, DMUX_EN_Pin, GPIO_PIN_RESET);
+//}
+//
+//static void IR_Demux_Enable(void)
+//{
+//    HAL_GPIO_WritePin(DMUX_EN_GPIO_Port, DMUX_EN_Pin, GPIO_PIN_SET);
+//}
+//
+//static void IR_Demux_Select(uint8_t led)
+//{
+//    // led = 0 selects IR_EM_1
+//    // led = 1 selects IR_EM_2
+//    // ...
+//    // led = 5 selects IR_EM_6
+//
+//    HAL_GPIO_WritePin(DMUX_A0_GPIO_Port, DMUX_A0_Pin,
+//                      (led & 0x01) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+//
+//    HAL_GPIO_WritePin(DMUX_A1_GPIO_Port, DMUX_A1_Pin,
+//                      (led & 0x02) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+//
+//    HAL_GPIO_WritePin(DMUX_A2_GPIO_Port, DMUX_A2_Pin,
+//                      (led & 0x04) ? GPIO_PIN_SET : GPIO_PIN_RESET);
+//}
+//
+//static void IR_LED_On(uint8_t led)
+//{
+//    IR_Demux_Disable();      // avoid glitches while changing address
+//    IR_Demux_Select(led);
+//    IR_Demux_Enable();
+//}
+//
+//static void IR_LED_Off(void)
+//{
+//    IR_Demux_Disable();
+//}
+//
+//static void DWT_Delay_Init(void)
+//{
+//    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;  // Enable DWT access
+//    DWT->CYCCNT = 0;                                 // Reset cycle counter
+//    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;             // Enable cycle counter
+//}
+//
+//static void delay_us(uint32_t us)
+//{
+//    uint32_t start = DWT->CYCCNT;
+//    uint32_t cycles = (SystemCoreClock / 1000000U) * us;
+//
+//    while ((uint32_t)(DWT->CYCCNT - start) < cycles)
+//    {
+//        // wait
+//    }
+//}
+//
+//static void IR_LED_Pulse_us(uint8_t led, uint32_t pulse_us)
+//{
+//    if (pulse_us > IR_LED_MAX_PULSE_US)
+//    {
+//        pulse_us = IR_LED_MAX_PULSE_US;  // safety limit for your SFH4545 pulse
+//    }
+//
+//    IR_LED_On(led);
+//    delay_us(pulse_us);
+//    IR_LED_Off();
+//}
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-    if (hadc->Instance == ADC1)
-    {
-        adc1_dma_ready = 1;
-    }
-    else if (hadc->Instance == ADC2)
-    {
-        adc2_dma_ready = 1;
-    }
+	IR_Sensors_OnAdcConvCplt(hadc);
 }
 
-static void IR_ADC_DMA_Start(void)
-{
-    // Optional but recommended on STM32G4
-    if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
-    {
-        Error_Handler();
-    }
-
-    if (HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED) != HAL_OK)
-    {
-        Error_Handler();
-    }
-
-    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc1_dma, ADC1_IR_COUNT) != HAL_OK)
-    {
-        Error_Handler();
-    }
-
-    if (HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc2_dma, ADC2_IR_COUNT) != HAL_OK)
-    {
-        Error_Handler();
-    }
-}
-
-static void IR_ADC_UpdateRawValues(void)
-{
-// Raw data is inverted
-    ir_raw[0] = 4095 - adc2_dma[0];   // IR_REC_1
-    ir_raw[1] = 4095 - adc1_dma[0];   // IR_REC_2
-    ir_raw[2] = 4095 - adc1_dma[1];   // IR_REC_3
-    ir_raw[3] = 4095 - adc1_dma[2];   // IR_REC_4
-    ir_raw[4] = 4095 - adc1_dma[3];   // IR_REC_5
-    ir_raw[5] = 4095 - adc2_dma[1];   // IR_REC_6
-}
+//static void IR_ADC_DMA_Start(void)
+//{
+//    // Optional but recommended on STM32G4
+//    if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
+//    {
+//        Error_Handler();
+//    }
+//
+//    if (HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED) != HAL_OK)
+//    {
+//        Error_Handler();
+//    }
+//
+//    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc1_dma, ADC1_IR_COUNT) != HAL_OK)
+//    {
+//        Error_Handler();
+//    }
+//
+//    if (HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc2_dma, ADC2_IR_COUNT) != HAL_OK)
+//    {
+//        Error_Handler();
+//    }
+//}
+//
+//static void IR_ADC_UpdateRawValues(void)
+//{
+//// Raw data is inverted
+//    ir_raw[0] = 4095 - adc2_dma[0];   // IR_REC_1
+//    ir_raw[1] = 4095 - adc1_dma[0];   // IR_REC_2
+//    ir_raw[2] = 4095 - adc1_dma[1];   // IR_REC_3
+//    ir_raw[3] = 4095 - adc1_dma[2];   // IR_REC_4
+//    ir_raw[4] = 4095 - adc1_dma[3];   // IR_REC_5
+//    ir_raw[5] = 4095 - adc2_dma[1];   // IR_REC_6
+//}
 
 /* USER CODE END 0 */
 
@@ -389,21 +373,17 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
-  MX_TIM3_Init();
   MX_TIM4_Init();
-  MX_TIM6_Init();
-  MX_TIM7_Init();
   MX_TIM8_Init();
   MX_USART2_UART_Init();
+  MX_TIM7_Init();
+  MX_TIM6_Init();
+  MX_TIM3_Init();
+  MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
 
   dt = Timer_GetUpdatePeriod_s(&htim6);
 
-  DWT_Delay_Init();
-
-  IR_LED_Off();
-
-  IR_ADC_DMA_Start();
 
   Motor_Init(&motor_left);
   Motor_Init(&motor_right);
@@ -453,6 +433,11 @@ int main(void)
 		  IMU_LPF1_ENABLED
   );
 
+  HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
+  HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
+
+  IR_Sensors_Init(&hadc1, &hadc2, &htim16, &ir_demux);
+
   RobotController_Init(&robot,
                          &motor_left, &motor_right,
                          &enc_left,   &enc_right,
@@ -479,14 +464,27 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  float error_sum = 0;
-
   while (1)
   {
-	  float z = IMU_GetGyroZDeg(&imu);
-	  error_sum += z * 0.05;
-	  printf("error sum: %.6f \r\n", z);
-	  HAL_Delay(50);
+      if (IR_Sensors_FrameReady())
+      {
+          const int32_t *ir = IR_Sensors_GetSignal();
+
+          int32_t ir1 = ir[0];
+          int32_t ir2 = ir[1];
+          int32_t ir3 = ir[2];
+          int32_t ir4 = ir[3];
+          int32_t ir5 = ir[4];
+          int32_t ir6 = ir[5];
+
+          printf("%ld %ld %ld %ld %ld %ld \r\n", ir1, ir2, ir3, ir4, ir5, ir6);
+
+          /*
+           * Use ir1..ir6 here or copy them into your sensor structure.
+           */
+
+          IR_Sensors_ClearFrameReady();
+      }
   }
     /* USER CODE END WHILE */
 
@@ -569,7 +567,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.NbrOfConversion = 4;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
@@ -663,7 +661,7 @@ static void MX_ADC2_Init(void)
   hadc2.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc2.Init.EOCSelection = ADC_EOC_SEQ_CONV;
   hadc2.Init.LowPowerAutoWait = DISABLE;
-  hadc2.Init.ContinuousConvMode = ENABLE;
+  hadc2.Init.ContinuousConvMode = DISABLE;
   hadc2.Init.NbrOfConversion = 2;
   hadc2.Init.DiscontinuousConvMode = DISABLE;
   hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
@@ -1135,6 +1133,38 @@ static void MX_TIM8_Init(void)
 
   /* USER CODE END TIM8_Init 2 */
   HAL_TIM_MspPostInit(&htim8);
+
+}
+
+/**
+  * @brief TIM16 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM16_Init(void)
+{
+
+  /* USER CODE BEGIN TIM16_Init 0 */
+
+  /* USER CODE END TIM16_Init 0 */
+
+  /* USER CODE BEGIN TIM16_Init 1 */
+
+  /* USER CODE END TIM16_Init 1 */
+  htim16.Instance = TIM16;
+  htim16.Init.Prescaler = 169;
+  htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim16.Init.Period = 65535;
+  htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim16.Init.RepetitionCounter = 0;
+  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim16) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM16_Init 2 */
+
+  /* USER CODE END TIM16_Init 2 */
 
 }
 

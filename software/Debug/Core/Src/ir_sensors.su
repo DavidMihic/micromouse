@@ -1,0 +1,12 @@
+../Core/Src/ir_sensors.c:38:13:IR_Sensors_Init	136	static
+../Core/Src/ir_sensors.c:117:13:IR_Sensors_StartFrame	8	static
+../Core/Src/ir_sensors.c:127:6:IR_Sensors_Stop	8	static
+../Core/Src/ir_sensors.c:137:6:IR_Sensors_IsBusy	8	static
+../Core/Src/ir_sensors.c:147:6:IR_Sensors_FrameReady	8	static
+../Core/Src/ir_sensors.c:157:6:IR_Sensors_ClearFrameReady	8	static
+../Core/Src/ir_sensors.c:167:16:IR_Sensors_GetSignal	4	static
+../Core/Src/ir_sensors.c:173:13:IR_Sensors_GetLastError	4	static
+../Core/Src/ir_sensors.c:178:10:IR_Sensors_GetTimeoutCount	4	static
+../Core/Src/ir_sensors.c:183:6:IR_Sensors_OnAdcConvCplt	16	static
+../Core/Src/ir_sensors.c:193:6:IR_Sensors_OnTimerElapsed	16	static
+../Core/Src/ir_sensors.c:203:13:IR_Sensors_GetHandle	4	static
