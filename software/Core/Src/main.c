@@ -72,6 +72,7 @@ SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
@@ -95,11 +96,12 @@ static void MX_ADC2_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_TIM6_Init(void);
+static void MX_TIM7_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_TIM7_Init(void);
-static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
@@ -218,6 +220,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
+	if (htim->Instance == TIM3) {
+		IMU_Update(&imu);
+	}
+
 	if (htim->Instance == TIM6)
 	{
 //		updateVelocityLoop();
@@ -383,11 +389,12 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
+  MX_TIM3_Init();
   MX_TIM4_Init();
+  MX_TIM6_Init();
+  MX_TIM7_Init();
   MX_TIM8_Init();
   MX_USART2_UART_Init();
-  MX_TIM7_Init();
-  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 
   dt = Timer_GetUpdatePeriod_s(&htim6);
@@ -422,6 +429,7 @@ int main(void)
   VelocityPI_SetSetpoint(&pi_right, 0.0f);
 
   HAL_TIM_Base_Start_IT(&htim6);
+  HAL_TIM_Base_Start_IT(&htim3);
 
   NeoPixel_Init(&neopixel, &htim8, TIM_CHANNEL_1);
   NeoPixel_SetColor(&neopixel, COLOR_OFF);
@@ -441,7 +449,7 @@ int main(void)
 		  &hspi1,
 		  GPIOA,
 		  GPIO_PIN_4,
-		  IMU_GYRO_ODR_833_HZ,
+		  IMU_GYRO_ODR_1_66_KHZ,
 		  IMU_LPF1_ENABLED
   );
 
@@ -463,31 +471,9 @@ int main(void)
 
   while (1)
   {
-
+	  printf("gyro_z = %.6f rad/s\r\n", IMU_GetGyroZRad(&imu));
+	  HAL_Delay(50);
   }
-  /* USER CODE END WHILE */
-
-//
-//	IR_LED_Pulse_us(IR_LED_5, 100);
-//
-//	if (adc1_dma_ready && adc2_dma_ready)
-//	{
-//		adc1_dma_ready = 0;
-//		adc2_dma_ready = 0;
-//
-//		IR_ADC_UpdateRawValues();
-//
-//		printf("IR: %4u %4u %4u %4u %4u %4u\r\n",
-//			   ir_raw[0],
-//			   ir_raw[1],
-//			   ir_raw[2],
-//			   ir_raw[3],
-//			   ir_raw[4],
-//			   ir_raw[5]);
-//	}
-//
-//	HAL_Delay(40);
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -726,7 +712,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
   hspi1.Init.CLKPhase = SPI_PHASE_2EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -883,6 +869,51 @@ static void MX_TIM2_Init(void)
   /* USER CODE BEGIN TIM2_Init 2 */
 
   /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 16999;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 9;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
 
 }
 

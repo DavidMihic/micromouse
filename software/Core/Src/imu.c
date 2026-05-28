@@ -142,7 +142,8 @@ float IMU_GetGyroZDeg(const IMU *imu)
     if (imu == NULL)
         return 0.0f;
 
-    return imu->gyro_z_dps;
+    // negative because imu is on the bottom of the pcb
+    return -imu->gyro_z_dps;
 }
 
 float IMU_GetGyroZRad(const IMU *imu)
@@ -150,5 +151,6 @@ float IMU_GetGyroZRad(const IMU *imu)
     if (imu == NULL)
         return 0.0f;
 
-    return imu->gyro_z_rad_s;
+    // negative because imu is on the bottom of the pcb
+    return -imu->gyro_z_rad_s;
 }

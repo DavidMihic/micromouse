@@ -6,4 +6,4 @@
 ../Core/Src/imu.c:96:12:IMU_CalibrateGyro	4
 ../Core/Src/imu.c:122:12:IMU_Update	2
 ../Core/Src/imu.c:140:7:IMU_GetGyroZDeg	2
-../Core/Src/imu.c:148:7:IMU_GetGyroZRad	2
+../Core/Src/imu.c:149:7:IMU_GetGyroZRad	2
