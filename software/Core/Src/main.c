@@ -148,8 +148,6 @@ RobotController robot;
 
 int __io_putchar(int ch)
 {
-    /* Place your implementation here.
-       e.g., write a character to the USART and loop until the end of transmission */
     HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
     return ch;
 }
@@ -174,14 +172,6 @@ static float Timer_GetUpdatePeriod_s(TIM_HandleTypeDef *htim)
     return 1.0f / update_freq_hz;
 }
 
-void updateVelocityLoop(void)
-{
-	Encoder_Update(&enc_left, dt);
-	Encoder_Update(&enc_right, dt);
-
-	Motor_Set(&motor_left, (int16_t)VelocityPI_Update(&pi_left, Encoder_GetRawVelocityRadPerSecond(&enc_left)));
-	Motor_Set(&motor_right, (int16_t)VelocityPI_Update(&pi_right, Encoder_GetRawVelocityRadPerSecond(&enc_right)));
-}
 
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 {
@@ -208,7 +198,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	if (htim->Instance == TIM6)
 	{
-//		updateVelocityLoop();
 		RobotController_Update(&robot, dt);
 
         if (!IR_Sensors_IsBusy() && !IR_Sensors_FrameReady())
@@ -225,116 +214,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 }
 
-//static void IR_Demux_Disable(void)
-//{
-//    // SN74AHC238 selected output is active only when enable is active.
-//    // In your schematic, DMUX_EN goes to the active-high enable pin.
-//    HAL_GPIO_WritePin(DMUX_EN_GPIO_Port, DMUX_EN_Pin, GPIO_PIN_RESET);
-//}
-//
-//static void IR_Demux_Enable(void)
-//{
-//    HAL_GPIO_WritePin(DMUX_EN_GPIO_Port, DMUX_EN_Pin, GPIO_PIN_SET);
-//}
-//
-//static void IR_Demux_Select(uint8_t led)
-//{
-//    // led = 0 selects IR_EM_1
-//    // led = 1 selects IR_EM_2
-//    // ...
-//    // led = 5 selects IR_EM_6
-//
-//    HAL_GPIO_WritePin(DMUX_A0_GPIO_Port, DMUX_A0_Pin,
-//                      (led & 0x01) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-//
-//    HAL_GPIO_WritePin(DMUX_A1_GPIO_Port, DMUX_A1_Pin,
-//                      (led & 0x02) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-//
-//    HAL_GPIO_WritePin(DMUX_A2_GPIO_Port, DMUX_A2_Pin,
-//                      (led & 0x04) ? GPIO_PIN_SET : GPIO_PIN_RESET);
-//}
-//
-//static void IR_LED_On(uint8_t led)
-//{
-//    IR_Demux_Disable();      // avoid glitches while changing address
-//    IR_Demux_Select(led);
-//    IR_Demux_Enable();
-//}
-//
-//static void IR_LED_Off(void)
-//{
-//    IR_Demux_Disable();
-//}
-//
-//static void DWT_Delay_Init(void)
-//{
-//    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;  // Enable DWT access
-//    DWT->CYCCNT = 0;                                 // Reset cycle counter
-//    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;             // Enable cycle counter
-//}
-//
-//static void delay_us(uint32_t us)
-//{
-//    uint32_t start = DWT->CYCCNT;
-//    uint32_t cycles = (SystemCoreClock / 1000000U) * us;
-//
-//    while ((uint32_t)(DWT->CYCCNT - start) < cycles)
-//    {
-//        // wait
-//    }
-//}
-//
-//static void IR_LED_Pulse_us(uint8_t led, uint32_t pulse_us)
-//{
-//    if (pulse_us > IR_LED_MAX_PULSE_US)
-//    {
-//        pulse_us = IR_LED_MAX_PULSE_US;  // safety limit for your SFH4545 pulse
-//    }
-//
-//    IR_LED_On(led);
-//    delay_us(pulse_us);
-//    IR_LED_Off();
-//}
-
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
 	IR_Sensors_OnAdcConvCplt(hadc);
 }
 
-//static void IR_ADC_DMA_Start(void)
-//{
-//    // Optional but recommended on STM32G4
-//    if (HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED) != HAL_OK)
-//    {
-//        Error_Handler();
-//    }
-//
-//    if (HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED) != HAL_OK)
-//    {
-//        Error_Handler();
-//    }
-//
-//    if (HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adc1_dma, ADC1_IR_COUNT) != HAL_OK)
-//    {
-//        Error_Handler();
-//    }
-//
-//    if (HAL_ADC_Start_DMA(&hadc2, (uint32_t *)adc2_dma, ADC2_IR_COUNT) != HAL_OK)
-//    {
-//        Error_Handler();
-//    }
-//}
-//
-//static void IR_ADC_UpdateRawValues(void)
-//{
-//// Raw data is inverted
-//    ir_raw[0] = 4095 - adc2_dma[0];   // IR_REC_1
-//    ir_raw[1] = 4095 - adc1_dma[0];   // IR_REC_2
-//    ir_raw[2] = 4095 - adc1_dma[1];   // IR_REC_3
-//    ir_raw[3] = 4095 - adc1_dma[2];   // IR_REC_4
-//    ir_raw[4] = 4095 - adc1_dma[3];   // IR_REC_5
-//    ir_raw[5] = 4095 - adc2_dma[1];   // IR_REC_6
-//}
 
 /* USER CODE END 0 */
 
@@ -342,6 +226,7 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
   * @brief  The application entry point.
   * @retval int
   */
+
 int main(void)
 {
 
@@ -408,12 +293,8 @@ int main(void)
   VelocityPI_SetSetpoint(&pi_left, 	0.0f);
   VelocityPI_SetSetpoint(&pi_right, 0.0f);
 
-  HAL_TIM_Base_Start_IT(&htim6);
-  HAL_TIM_Base_Start_IT(&htim3);
-
   NeoPixel_Init(&neopixel, &htim8, TIM_CHANNEL_1);
-  NeoPixel_SetColor(&neopixel, COLOR_OFF);
-  NeoPixel_Show(&neopixel);
+  NeoPixel_Clear(&neopixel);
 
   Button_Init(&btn1, GPIOB, GPIO_PIN_4);
   Button_Init(&btn2, GPIOB, GPIO_PIN_13);
@@ -443,20 +324,15 @@ int main(void)
                          &enc_left,   &enc_right,
                          &pi_left,    &pi_right);
 
-  HAL_Delay(500);
-
 //  IMU Calibration
-  NeoPixel_SetColor(&neopixel, COLOR_GREEN);
-  NeoPixel_Show(&neopixel);
-
   if (status == IMU_OK) {
-	  IMU_CalibrateGyro(&imu, 1000);
+	  IMU_CalibrateGyro(&imu, 500);
   } else {
 
   }
 
-  NeoPixel_SetColor(&neopixel, COLOR_OFF);
-  NeoPixel_Show(&neopixel);
+ HAL_TIM_Base_Start_IT(&htim6);
+ HAL_TIM_Base_Start_IT(&htim3);
 
 
   /* USER CODE END 2 */
@@ -477,11 +353,8 @@ int main(void)
           int32_t ir5 = ir[4];
           int32_t ir6 = ir[5];
 
-          printf("%ld %ld %ld %ld %ld %ld \r\n", ir1, ir2, ir3, ir4, ir5, ir6);
-
-          /*
-           * Use ir1..ir6 here or copy them into your sensor structure.
-           */
+//        Simple IR test
+          printf("%d %d %d %d %d %d \r\n", ir1 > 1000, ir2 > 1000, ir3 > 1000, ir4 > 1000, ir5 > 1000, ir6 > 1000);
 
           IR_Sensors_ClearFrameReady();
       }

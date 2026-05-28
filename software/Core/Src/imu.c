@@ -128,7 +128,8 @@ IMU_Status IMU_Update(IMU *imu)
 
     IMU_ReadRegisters(imu, LSM6DSO32_REG_OUTZ_L_G, data, 2);
 
-    imu->raw_gyro_z = (int16_t)((data[1] << 8) | data[0]);
+    // negative because imu is on the bottom of the pcb
+    imu->raw_gyro_z = -1 * (int16_t)((data[1] << 8) | data[0]);
 
     float corrected_gyro = (float)imu->raw_gyro_z - imu->gyro_z_bias;
     imu->gyro_z_dps = corrected_gyro * LSM6DSO32_GYRO_SENS_1000;
@@ -142,8 +143,8 @@ float IMU_GetGyroZDeg(const IMU *imu)
     if (imu == NULL)
         return 0.0f;
 
-    // negative because imu is on the bottom of the pcb
-    return -imu->gyro_z_dps;
+
+    return imu->gyro_z_dps;
 }
 
 float IMU_GetGyroZRad(const IMU *imu)
@@ -151,6 +152,5 @@ float IMU_GetGyroZRad(const IMU *imu)
     if (imu == NULL)
         return 0.0f;
 
-    // negative because imu is on the bottom of the pcb
-    return -imu->gyro_z_rad_s;
+    return imu->gyro_z_rad_s;
 }

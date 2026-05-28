@@ -8,7 +8,7 @@
 #include "neopixel.h"
 #include <string.h>
 
-const NeoPixel_Color COLOR_OFF         = { .red = 0,   .green = 0,   .blue = 0 };
+// Nowhere near max brightness to reduce current
 const NeoPixel_Color COLOR_RED 		 = { .red = 100, .green = 0,   .blue = 0 };
 const NeoPixel_Color COLOR_GREEN       = { .red = 0,   .green = 100, .blue = 0 };
 const NeoPixel_Color COLOR_BLUE        = { .red = 0,   .green = 0,   .blue = 100 };
@@ -75,7 +75,8 @@ NeoPixel_Status NeoPixel_SetColor(NeoPixel *pixel, NeoPixel_Color color)
 
 NeoPixel_Status NeoPixel_Clear(NeoPixel *pixel)
 {
-    return NeoPixel_SetColor(pixel, COLOR_OFF);
+	NeoPixel_SetColorRGB(pixel, 0, 0, 0);
+    return NeoPixel_Show(pixel);
 }
 
 NeoPixel_Status NeoPixel_Show(NeoPixel *pixel)

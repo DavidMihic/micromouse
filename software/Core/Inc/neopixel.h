@@ -42,7 +42,6 @@ typedef struct
     volatile uint8_t is_transferring;
 } NeoPixel;
 
-extern const NeoPixel_Color COLOR_OFF;
 extern const NeoPixel_Color COLOR_RED;
 extern const NeoPixel_Color COLOR_GREEN;
 extern const NeoPixel_Color COLOR_BLUE;

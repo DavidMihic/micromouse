@@ -5,5 +5,5 @@
 ../Core/Src/imu.c:41:12:IMU_Init	32	static
 ../Core/Src/imu.c:96:12:IMU_CalibrateGyro	32	static
 ../Core/Src/imu.c:122:12:IMU_Update	24	static
-../Core/Src/imu.c:140:7:IMU_GetGyroZDeg	16	static
-../Core/Src/imu.c:149:7:IMU_GetGyroZRad	16	static
+../Core/Src/imu.c:141:7:IMU_GetGyroZDeg	16	static
+../Core/Src/imu.c:150:7:IMU_GetGyroZRad	16	static
