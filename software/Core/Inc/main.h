@@ -91,6 +91,7 @@ void Error_Handler(void);
 #define IR_REC_4_GPIO_Port GPIOB
 #define BTN_2_Pin GPIO_PIN_13
 #define BTN_2_GPIO_Port GPIOB
+#define BTN_2_EXTI_IRQn EXTI15_10_IRQn
 #define IR_REC_5_Pin GPIO_PIN_14
 #define IR_REC_5_GPIO_Port GPIOB
 #define IR_REC_6_Pin GPIO_PIN_15
@@ -109,6 +110,7 @@ void Error_Handler(void);
 #define LED_IN_GPIO_Port GPIOA
 #define BTN_1_Pin GPIO_PIN_4
 #define BTN_1_GPIO_Port GPIOB
+#define BTN_1_EXTI_IRQn EXTI4_IRQn
 #define DMUX_A0_Pin GPIO_PIN_5
 #define DMUX_A0_GPIO_Port GPIOB
 #define E_A_R_Pin GPIO_PIN_6

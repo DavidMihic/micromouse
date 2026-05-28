@@ -28,6 +28,7 @@
 #include "neopixel.h"
 #include "imu.h"
 #include "velocity_pi.h"
+#include "button.h"
 
 /* USER CODE END Includes */
 
@@ -71,6 +72,7 @@ SPI_HandleTypeDef hspi1;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim7;
 TIM_HandleTypeDef htim8;
 DMA_HandleTypeDef hdma_tim8_ch1;
 
@@ -94,6 +96,7 @@ static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM7_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
@@ -149,6 +152,10 @@ IMU imu;
 VelocityPI pi_left;
 VelocityPI pi_right;
 
+Button btn1;
+Button btn2;
+DipSwitch dip_sw;
+
 int __io_putchar(int ch)
 {
     /* Place your implementation here.
@@ -164,6 +171,23 @@ void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 		extern NeoPixel neopixel;
 		NeoPixel_DMA_Callback(&neopixel, htim);
     }
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if (GPIO_Pin == btn1.pin)
+		Button_EXTI_Callback(&btn1, GPIO_Pin, &htim7);
+	else if (GPIO_Pin == btn2.pin)
+		Button_EXTI_Callback(&btn2, GPIO_Pin, &htim7);
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	if (htim->Instance == TIM6)
+		HAL_IncTick();
+
+    if (htim->Instance == TIM7)
+		Button_TIM_PeriodElapsedCallback(htim);
 }
 
 static void IR_Demux_Disable(void)
@@ -324,6 +348,7 @@ int main(void)
   MX_TIM4_Init();
   MX_TIM8_Init();
   MX_USART2_UART_Init();
+  MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
 
   DWT_Delay_Init();
@@ -353,6 +378,15 @@ int main(void)
                   1000.0f);
 
   NeoPixel_Init(&neopixel, &htim8, TIM_CHANNEL_1);
+
+  Button_Init(&btn1, GPIOB, GPIO_PIN_4);
+  Button_Init(&btn2, GPIOB, GPIO_PIN_13);
+
+  DipSwitch_Init(&dip_sw,
+		  GPIOC, GPIO_PIN_13,
+		  GPIOC, GPIO_PIN_14,
+		  GPIOC, GPIO_PIN_15,
+		  GPIO_PIN_SET);
 
   IMU_Status status = IMU_Init(
 		  &imu,
@@ -893,6 +927,44 @@ static void MX_TIM4_Init(void)
 }
 
 /**
+  * @brief TIM7 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM7_Init(void)
+{
+
+  /* USER CODE BEGIN TIM7_Init 0 */
+  __HAL_RCC_TIM7_CLK_ENABLE();
+  /* USER CODE END TIM7_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 16999;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 199;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
+
+  /* USER CODE END TIM7_Init 2 */
+
+}
+
+/**
   * @brief TIM8 Initialization Function
   * @param None
   * @retval None
@@ -1088,11 +1160,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(IMU_CS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : IMU_INT2_Pin BTN_2_Pin BTN_1_Pin */
-  GPIO_InitStruct.Pin = IMU_INT2_Pin|BTN_2_Pin|BTN_1_Pin;
+  /*Configure GPIO pin : IMU_INT2_Pin */
+  GPIO_InitStruct.Pin = IMU_INT2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(IMU_INT2_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : DMUX_EN_Pin DMUX_A0_Pin DMUX_A1_Pin DMUX_A2_Pin */
   GPIO_InitStruct.Pin = DMUX_EN_Pin|DMUX_A0_Pin|DMUX_A1_Pin|DMUX_A2_Pin;
@@ -1100,6 +1172,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : BTN_2_Pin BTN_1_Pin */
+  GPIO_InitStruct.Pin = BTN_2_Pin|BTN_1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 

@@ -58,6 +58,7 @@
 extern DMA_HandleTypeDef hdma_adc1;
 extern DMA_HandleTypeDef hdma_adc2;
 extern DMA_HandleTypeDef hdma_tim8_ch1;
+extern TIM_HandleTypeDef htim7;
 extern DMA_HandleTypeDef hdma_usart2_rx;
 extern DMA_HandleTypeDef hdma_usart2_tx;
 extern UART_HandleTypeDef huart2;
@@ -204,6 +205,20 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
+  * @brief This function handles EXTI line4 interrupt.
+  */
+void EXTI4_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI4_IRQn 0 */
+
+  /* USER CODE END EXTI4_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(BTN_1_Pin);
+  /* USER CODE BEGIN EXTI4_IRQn 1 */
+
+  /* USER CODE END EXTI4_IRQn 1 */
+}
+
+/**
   * @brief This function handles DMA1 channel1 global interrupt.
   */
 void DMA1_Channel1_IRQHandler(void)
@@ -285,6 +300,34 @@ void USART2_IRQHandler(void)
   /* USER CODE BEGIN USART2_IRQn 1 */
 
   /* USER CODE END USART2_IRQn 1 */
+}
+
+/**
+  * @brief This function handles EXTI line[15:10] interrupts.
+  */
+void EXTI15_10_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI15_10_IRQn 0 */
+
+  /* USER CODE END EXTI15_10_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(BTN_2_Pin);
+  /* USER CODE BEGIN EXTI15_10_IRQn 1 */
+
+  /* USER CODE END EXTI15_10_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM7 global interrupt, DAC2 and DAC4 channel underrun error interrupts.
+  */
+void TIM7_DAC_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM7_DAC_IRQn 0 */
+
+  /* USER CODE END TIM7_DAC_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim7);
+  /* USER CODE BEGIN TIM7_DAC_IRQn 1 */
+
+  /* USER CODE END TIM7_DAC_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
