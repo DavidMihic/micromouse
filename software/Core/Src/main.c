@@ -29,6 +29,7 @@
 #include "imu.h"
 #include "velocity_pi.h"
 #include "button.h"
+#include "robot_controller.h"
 
 /* USER CODE END Includes */
 
@@ -159,6 +160,8 @@ Button btn1;
 Button btn2;
 DipSwitch dip_sw;
 
+RobotController robot;
+
 int __io_putchar(int ch)
 {
     /* Place your implementation here.
@@ -217,7 +220,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM6)
 	{
-		updateVelocityLoop();
+//		updateVelocityLoop();
+		RobotController_Update(&robot, dt);
 	}
 
     if (htim->Instance == TIM7)
@@ -447,6 +451,11 @@ int main(void)
 
   }
 
+  RobotController_Init(&robot,
+                         &motor_left, &motor_right,
+                         &enc_left,   &enc_right,
+                         &pi_left,    &pi_right);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -454,8 +463,9 @@ int main(void)
 
   while (1)
   {
-	  /* USER CODE END WHILE */
+
   }
+  /* USER CODE END WHILE */
 
 //
 //	IR_LED_Pulse_us(IR_LED_5, 100);

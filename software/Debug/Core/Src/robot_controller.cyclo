@@ -1,0 +1,15 @@
+../Core/Src/robot_controller.c:11:14:_wrap_angle	3
+../Core/Src/robot_controller.c:18:14:_clamp_float	3
+../Core/Src/robot_controller.c:25:13:_clamp_wheel_speeds	3
+../Core/Src/robot_controller.c:39:13:_body_vel_to_wheel_vel	1
+../Core/Src/robot_controller.c:53:13:_wheel_vel_to_body_vel	1
+../Core/Src/robot_controller.c:67:6:RobotController_Init	2
+../Core/Src/robot_controller.c:97:6:RobotController_SetCmdVel	2
+../Core/Src/robot_controller.c:125:6:RobotController_Update	3
+../Core/Src/robot_controller.c:161:6:RobotController_ResetOdometry	2
+../Core/Src/robot_controller.c:171:6:RobotController_Stop	2
+../Core/Src/robot_controller.c:186:7:RobotController_GetPoseX	2
+../Core/Src/robot_controller.c:191:7:RobotController_GetPoseY	2
+../Core/Src/robot_controller.c:196:7:RobotController_GetPoseTheta	2
+../Core/Src/robot_controller.c:201:7:RobotController_GetLinearVelocity	2
+../Core/Src/robot_controller.c:214:7:RobotController_GetAngularVelocity	2

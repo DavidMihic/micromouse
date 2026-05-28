@@ -4,6 +4,7 @@
 "./Core/Src/main.o"
 "./Core/Src/motor.o"
 "./Core/Src/neopixel.o"
+"./Core/Src/robot_controller.o"
 "./Core/Src/stm32g4xx_hal_msp.o"
 "./Core/Src/stm32g4xx_it.o"
 "./Core/Src/syscalls.o"
