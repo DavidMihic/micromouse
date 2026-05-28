@@ -38,37 +38,11 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define NEOPIXEL_TIMER        htim8
-#define NEOPIXEL_CHANNEL      TIM_CHANNEL_1
 
-#define NEOPIXEL_ARR          211
-
-#define WS2812_0              60
-#define WS2812_1              120
-
-#define NUM_LEDS              1
-#define BITS_PER_LED          24
-#define RESET_SLOTS           50
-
-#define LSM6DSO32_WHO_AM_I   0x0F
-
-#define LSM6_CTRL1_XL   0x10
-#define LSM6_CTRL2_G    0x11
-#define LSM6_CTRL3_C    0x12
-#define LSM6_OUTX_L_G   0x22
-
-#define IMU_CS_LOW()    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET)
-#define IMU_CS_HIGH()   HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET)
 
 #define ADC1_IR_COUNT  4
 #define ADC2_IR_COUNT  2
 
-#define MOTOR_PWM_MAX 1000
-
-#define L_IN1_CH   TIM_CHANNEL_1   // PA8
-#define L_IN2_CH   TIM_CHANNEL_2   // PA9
-#define R_IN1_CH   TIM_CHANNEL_3   // PA10
-#define R_IN2_CH   TIM_CHANNEL_4   // PA11
 
 #define IR_LED_1   0
 #define IR_LED_2   1
@@ -121,8 +95,6 @@ static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-static uint16_t pwmData[NUM_LEDS * BITS_PER_LED + RESET_SLOTS];
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -144,7 +116,38 @@ uint16_t ir_raw[6];
 
 volatile uint8_t adc1_dma_ready = 0;
 volatile uint8_t adc2_dma_ready = 0;
-// TIM1 channel mapping
+
+Motor motor_left =
+{
+    .htim_in1 = &htim1,
+    .channel_in1 = TIM_CHANNEL_1,
+
+    .htim_in2 = &htim1,
+    .channel_in2 = TIM_CHANNEL_2,
+
+    .direction = -1
+};
+
+Motor motor_right =
+{
+    .htim_in1 = &htim1,
+    .channel_in1 = TIM_CHANNEL_3,
+
+    .htim_in2 = &htim1,
+    .channel_in2 = TIM_CHANNEL_4,
+
+    .direction = 1
+};
+
+Encoder enc_left;
+Encoder enc_right;
+
+NeoPixel neopixel;
+
+IMU imu;
+
+VelocityPI pi_left;
+VelocityPI pi_right;
 
 int __io_putchar(int ch)
 {
@@ -154,151 +157,13 @@ int __io_putchar(int ch)
     return ch;
 }
 
-void motors_start_pwm(void)
-{
-    HAL_TIM_PWM_Start(&htim1, L_IN1_CH);
-    HAL_TIM_PWM_Start(&htim1, L_IN2_CH);
-    HAL_TIM_PWM_Start(&htim1, R_IN1_CH);
-    HAL_TIM_PWM_Start(&htim1, R_IN2_CH);
-}
-
-static int16_t clamp_cmd(int16_t value)
-{
-    if (value > MOTOR_PWM_MAX)  return MOTOR_PWM_MAX;
-    if (value < -MOTOR_PWM_MAX) return -MOTOR_PWM_MAX;
-    return value;
-}
-
-static void set_pwm_permille(uint32_t channel, uint16_t permille)
-{
-    if (permille > 1000)
-        permille = 1000;
-
-    uint32_t period = __HAL_TIM_GET_AUTORELOAD(&htim1) + 1;
-    uint32_t compare = ((uint32_t)permille * period) / 1000;
-
-    __HAL_TIM_SET_COMPARE(&htim1, channel, compare);
-}
-
-static void motor_set_one_brake_pwm(int16_t cmd, uint32_t ch_in1, uint32_t ch_in2)
-{
-    cmd = clamp_cmd(cmd);
-
-    if (cmd > 0)
-    {
-        // Forward:
-        // IN1 always high.
-        // IN2 high during brake, low during drive.
-        set_pwm_permille(ch_in1, 1000);
-        set_pwm_permille(ch_in2, 1000 - cmd);
-    }
-    else if (cmd < 0)
-    {
-        // Reverse:
-        // IN2 always high.
-        // IN1 high during brake, low during drive.
-        uint16_t mag = -cmd;
-
-        set_pwm_permille(ch_in1, 1000 - mag);
-        set_pwm_permille(ch_in2, 1000);
-    }
-    else
-    {
-        // Coast / sleep
-        set_pwm_permille(ch_in1, 0);
-        set_pwm_permille(ch_in2, 0);
-    }
-}
-
-void motors_set(int16_t left_cmd, int16_t right_cmd)
-{
-    motor_set_one_brake_pwm(left_cmd,  L_IN1_CH, L_IN2_CH);
-    motor_set_one_brake_pwm(right_cmd, R_IN1_CH, R_IN2_CH);
-}
-
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM8)
     {
-        HAL_TIM_PWM_Stop_DMA(&NEOPIXEL_TIMER, NEOPIXEL_CHANNEL);
-        __HAL_TIM_SET_COMPARE(&NEOPIXEL_TIMER, NEOPIXEL_CHANNEL, 0);
+
     }
 }
-//
-//uint8_t IMU_ReadWhoAmI(void)
-//{
-//    uint8_t tx[2] = { LSM6DSO32_WHO_AM_I | 0x80, 0x00 };
-//    uint8_t rx[2] = { 0 };
-//
-//    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_RESET);
-//
-//    HAL_SPI_TransmitReceive(&hspi1, tx, rx, 2, HAL_MAX_DELAY);
-//
-//    HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
-//
-//    return rx[1];
-//}
-//
-//void IMU_WriteReg(uint8_t reg, uint8_t value)
-//{
-//    uint8_t tx[2];
-//
-//    tx[0] = reg & 0x7F;   // write command
-//    tx[1] = value;
-//
-//    IMU_CS_LOW();
-//    HAL_SPI_Transmit(&hspi1, tx, 2, HAL_MAX_DELAY);
-//    IMU_CS_HIGH();
-//}
-//
-//void IMU_ReadRegs(uint8_t reg, uint8_t *data, uint8_t len)
-//{
-//    uint8_t addr = reg | 0x80;   // read command
-//
-//    IMU_CS_LOW();
-//    HAL_SPI_Transmit(&hspi1, &addr, 1, HAL_MAX_DELAY);
-//    HAL_SPI_Receive(&hspi1, data, len, HAL_MAX_DELAY);
-//    IMU_CS_HIGH();
-//}
-//
-//void IMU_InitSimple(void)
-//{
-//    /*
-//     * CTRL3_C = 0x44
-//     * BDU = 1, IF_INC = 1
-//     */
-//    IMU_WriteReg(LSM6_CTRL3_C, 0x44);
-//
-//    /*
-//     * CTRL1_XL = 0x60
-//     * Accelerometer ON, 416 Hz, ±4 g
-//     */
-//    IMU_WriteReg(LSM6_CTRL1_XL, 0x60);
-//
-//    /*
-//     * CTRL2_G = 0x60
-//     * Gyroscope ON, 416 Hz, ±250 dps
-//     */
-//    IMU_WriteReg(LSM6_CTRL2_G, 0x60);
-//
-//    HAL_Delay(50);
-//}
-//
-//void IMU_ReadRaw(int16_t *gx, int16_t *gy, int16_t *gz,
-//                 int16_t *ax, int16_t *ay, int16_t *az)
-//{
-//    uint8_t data[12];
-//
-//    IMU_ReadRegs(LSM6_OUTX_L_G, data, 12);
-//
-//    *gx = (int16_t)((data[1]  << 8) | data[0]);
-//    *gy = (int16_t)((data[3]  << 8) | data[2]);
-//    *gz = (int16_t)((data[5]  << 8) | data[4]);
-//
-//    *ax = (int16_t)((data[7]  << 8) | data[6]);
-//    *ay = (int16_t)((data[9]  << 8) | data[8]);
-//    *az = (int16_t)((data[11] << 8) | data[10]);
-//}
 
 static void IR_Demux_Disable(void)
 {
@@ -418,38 +283,6 @@ static void IR_ADC_UpdateRawValues(void)
     ir_raw[5] = 4095 - adc2_dma[1];   // IR_REC_6
 }
 
-Motor motor_left =
-{
-    .htim_in1 = &htim1,
-    .channel_in1 = TIM_CHANNEL_1,
-
-    .htim_in2 = &htim1,
-    .channel_in2 = TIM_CHANNEL_2,
-
-    .direction = -1
-};
-
-Motor motor_right =
-{
-    .htim_in1 = &htim1,
-    .channel_in1 = TIM_CHANNEL_3,
-
-    .htim_in2 = &htim1,
-    .channel_in2 = TIM_CHANNEL_4,
-
-    .direction = 1
-};
-
-Encoder enc_left;
-Encoder enc_right;
-
-NeoPixel neopixel;
-
-IMU imu;
-
-VelocityPI pi_left;
-VelocityPI pi_right;
-
 /* USER CODE END 0 */
 
 /**
@@ -492,22 +325,6 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL);   // Left encoder
-  HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL);   // Right encoder
-
-  __HAL_TIM_SET_COUNTER(&htim2, 0);
-  __HAL_TIM_SET_COUNTER(&htim4, 0);
-
-  motors_start_pwm();
-
-  int16_t gx, gy, gz;
-  int16_t ax, ay, az;
-
-  HAL_GPIO_WritePin(IMU_CS_GPIO_Port, IMU_CS_Pin, GPIO_PIN_SET);
-  HAL_Delay(100);
-
-//  IMU_InitSimple();
-
   DWT_Delay_Init();
 
   IR_LED_Off();
@@ -517,8 +334,8 @@ int main(void)
   Motor_Init(&motor_left);
   Motor_Init(&motor_right);
 
-  Encoder_Init(&enc_left,  &htim2, 360, -1, 0.01f);
-  Encoder_Init(&enc_right, &htim4, 360,  1, 0.01f);
+  Encoder_Init(&enc_left,  &htim2, 360, -1, 0.1f);
+  Encoder_Init(&enc_right, &htim4, 360,  1, 0.1f);
 
   VelocityPI_Init(&pi_left,
                   11.5f,       // kp
@@ -580,12 +397,10 @@ int main(void)
         float dt = (now - last_tick) / 1000.0f;
         last_tick = now;
 
-//		Motor_Set(&motor_left, 1000);
-//		Motor_Set(&motor_right, 1000);
-
 	    Encoder_Update(&enc_left, dt);
 	    Encoder_Update(&enc_right, dt);
 
+//	    Using non filtered velocity because filtering creates a delay in the control loop
 	    float left_speed_rad = Encoder_GetRawVelocityRadPerSecond(&enc_left);
 	    float right_speed_rad = Encoder_GetRawVelocityRadPerSecond(&enc_right);
 
@@ -595,7 +410,9 @@ int main(void)
         Motor_Set(&motor_left, (int16_t)left_cmd);
         Motor_Set(&motor_right, (int16_t)right_cmd);
 
-		printf("vel_l: %.2f | vel_r: %.2f | ms = %d \r\n", left_speed_rad, right_speed_rad, msg_cnt * 10U);
+        if (msg_cnt % 3 == 0)
+        	printf("filt_vel_l: %.2f | filt_vel_r: %.2f | ms = %u \r\n", Encoder_GetVelocityRadPerSecond(&enc_left), Encoder_GetVelocityRadPerSecond(&enc_right), msg_cnt * 10U);
+		msg_cnt++;
 
     }
 //
