@@ -72,6 +72,7 @@ SPI_HandleTypeDef hspi1;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim6;
 TIM_HandleTypeDef htim7;
 TIM_HandleTypeDef htim8;
 DMA_HandleTypeDef hdma_tim8_ch1;
@@ -97,6 +98,7 @@ static void MX_TIM4_Init(void);
 static void MX_TIM8_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM7_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
@@ -151,6 +153,7 @@ IMU imu;
 
 VelocityPI pi_left;
 VelocityPI pi_right;
+float dt;
 
 Button btn1;
 Button btn2;
@@ -162,6 +165,35 @@ int __io_putchar(int ch)
        e.g., write a character to the USART and loop until the end of transmission */
     HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
     return ch;
+}
+
+static float Timer_GetUpdatePeriod_s(TIM_HandleTypeDef *htim)
+{
+    uint32_t timer_clk_hz;
+
+    uint32_t pclk1 = HAL_RCC_GetPCLK1Freq();
+
+    if ((RCC->CFGR & RCC_CFGR_PPRE1) == RCC_CFGR_PPRE1_DIV1)
+        timer_clk_hz = pclk1;
+    else
+        timer_clk_hz = 2U * pclk1;
+
+    uint32_t psc = htim->Instance->PSC;
+    uint32_t arr = htim->Instance->ARR;
+
+    float update_freq_hz =
+        (float)timer_clk_hz / ((float)(psc + 1U) * (float)(arr + 1U));
+
+    return 1.0f / update_freq_hz;
+}
+
+void updateVelocityLoop(void)
+{
+	Encoder_Update(&enc_left, dt);
+	Encoder_Update(&enc_right, dt);
+
+	Motor_Set(&motor_left, (int16_t)VelocityPI_Update(&pi_left, Encoder_GetRawVelocityRadPerSecond(&enc_left)));
+	Motor_Set(&motor_right, (int16_t)VelocityPI_Update(&pi_right, Encoder_GetRawVelocityRadPerSecond(&enc_right)));
 }
 
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
@@ -184,7 +216,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM6)
-		HAL_IncTick();
+	{
+		updateVelocityLoop();
+	}
 
     if (htim->Instance == TIM7)
 		Button_TIM_PeriodElapsedCallback(htim);
@@ -349,7 +383,10 @@ int main(void)
   MX_TIM8_Init();
   MX_USART2_UART_Init();
   MX_TIM7_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
+
+  dt = Timer_GetUpdatePeriod_s(&htim6);
 
   DWT_Delay_Init();
 
@@ -360,8 +397,8 @@ int main(void)
   Motor_Init(&motor_left);
   Motor_Init(&motor_right);
 
-  Encoder_Init(&enc_left,  &htim2, 360, -1, 0.1f);
-  Encoder_Init(&enc_right, &htim4, 360,  1, 0.1f);
+  Encoder_Init(&enc_left,  &htim2, 360, -1, 0.01f);
+  Encoder_Init(&enc_right, &htim4, 360,  1, 0.01f);
 
   VelocityPI_Init(&pi_left,
                   11.5f,       // kp
@@ -377,7 +414,14 @@ int main(void)
                   -1000.0f,
                   1000.0f);
 
+  VelocityPI_SetSetpoint(&pi_left, 	0.0f);
+  VelocityPI_SetSetpoint(&pi_right, 0.0f);
+
+  HAL_TIM_Base_Start_IT(&htim6);
+
   NeoPixel_Init(&neopixel, &htim8, TIM_CHANNEL_1);
+  NeoPixel_SetColor(&neopixel, COLOR_OFF);
+  NeoPixel_Show(&neopixel);
 
   Button_Init(&btn1, GPIOB, GPIO_PIN_4);
   Button_Init(&btn2, GPIOB, GPIO_PIN_13);
@@ -408,54 +452,9 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
- /*
-  * ADC1 CH1 - IR5
-  *
-  */
-
-  NeoPixel_SetColor(&neopixel, COLOR_OFF);
-  NeoPixel_Show(&neopixel);
-
-//  uint32_t last_tick = HAL_GetTick();
-//
-//  VelocityPI_SetSetpoint(&pi_left, 	0.0f);
-//  VelocityPI_SetSetpoint(&pi_right, 0.0f);
-//
-//  uint32_t msg_cnt = 0;
-
   while (1)
   {
-//    uint32_t now = HAL_GetTick();
-//    if ((now - last_tick) >= 10)
-//    {
-//        float dt = (now - last_tick) / 1000.0f;
-//        last_tick = now;
-//
-//	    Encoder_Update(&enc_left, dt);
-//	    Encoder_Update(&enc_right, dt);
-//
-////	    Using non filtered velocity because filtering creates a delay in the control loop
-//	    float left_speed_rad = Encoder_GetRawVelocityRadPerSecond(&enc_left);
-//	    float right_speed_rad = Encoder_GetRawVelocityRadPerSecond(&enc_right);
-//
-//        float left_cmd = VelocityPI_Update(&pi_left, left_speed_rad);
-//        float right_cmd = VelocityPI_Update(&pi_right, right_speed_rad);
-//
-//        Motor_Set(&motor_left, (int16_t)left_cmd);
-//        Motor_Set(&motor_right, (int16_t)right_cmd);
-//
-//        if (msg_cnt % 3 == 0)
-//        	printf("filt_vel_l: %.2f | filt_vel_r: %.2f | ms = %u \r\n", Encoder_GetVelocityRadPerSecond(&enc_left), Encoder_GetVelocityRadPerSecond(&enc_right), msg_cnt * 10U);
-//		msg_cnt++;
-//
-//    }
-//
-//        IMU_Update(&imu);
-//
-//        float gyro_z = IMU_GetGyroZRad(&imu);
-//        printf("gyro z %4f \r\n", gyro_z);
-//
-//        HAL_Delay(50);
+	  /* USER CODE END WHILE */
   }
 
 //
@@ -923,6 +922,44 @@ static void MX_TIM4_Init(void)
   /* USER CODE BEGIN TIM4_Init 2 */
 
   /* USER CODE END TIM4_Init 2 */
+
+}
+
+/**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 16999;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 99;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
 
 }
 

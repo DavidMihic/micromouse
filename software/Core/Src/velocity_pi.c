@@ -79,16 +79,10 @@ float VelocityPI_Update(VelocityPI *pi, float measurement)
 
     float proportional = pi->kp * pi->error;
 
-    /*
-     * Integrator update.
-     * ki has units: output_units / speed_units / second
-     */
+//  Update
     pi->integrator += pi->ki * pi->error * pi->dt;
 
-    /*
-     * Anti-windup by clamping the integrator.
-     * This keeps the integrator from growing beyond usable motor command range.
-     */
+//  Anti-windup
     pi->integrator = clamp_float(pi->integrator,
                                  pi->output_min,
                                  pi->output_max);
