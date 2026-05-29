@@ -17,7 +17,6 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <ir_array.h>
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -188,17 +187,21 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		Button_EXTI_Callback(&btn1, GPIO_Pin, &htim7);
 	else if (GPIO_Pin == btn2.pin)
 		Button_EXTI_Callback(&btn2, GPIO_Pin, &htim7);
+
+    if (GPIO_Pin == IMU_INT2_Pin)
+    {
+        IMU_NotifyDataReady(&imu);
+    }
 }
 
+
+float gyro_integrator = 0;
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim->Instance == TIM3) {
-		IMU_Update(&imu);
-	}
-
 	if (htim->Instance == TIM6)
 	{
 		RobotController_Update(&robot, dt);
+		gyro_integrator += IMU_GetGyroZRad(&imu) * dt * 180.0f / IMU_PI_F;
 
         if (!IR_Sensors_IsBusy() && !IR_Sensors_FrameReady())
         {
@@ -226,7 +229,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
   * @brief  The application entry point.
   * @retval int
   */
-
 int main(void)
 {
 
@@ -269,7 +271,6 @@ int main(void)
 
   dt = Timer_GetUpdatePeriod_s(&htim6);
 
-
   Motor_Init(&motor_left);
   Motor_Init(&motor_right);
 
@@ -296,23 +297,14 @@ int main(void)
   NeoPixel_Init(&neopixel, &htim8, TIM_CHANNEL_1);
   NeoPixel_Clear(&neopixel);
 
-  Button_Init(&btn1, GPIOB, GPIO_PIN_4);
-  Button_Init(&btn2, GPIOB, GPIO_PIN_13);
+  Button_Init(&btn1, BTN_1_GPIO_Port, BTN_1_Pin);
+  Button_Init(&btn2, BTN_2_GPIO_Port, BTN_2_Pin);
 
   DipSwitch_Init(&dip_sw,
-		  GPIOC, GPIO_PIN_13,
-		  GPIOC, GPIO_PIN_14,
-		  GPIOC, GPIO_PIN_15,
+		  DIP_1_GPIO_Port, DIP_1_Pin,
+		  DIP_2_GPIO_Port, DIP_2_Pin,
+		  DIP_3_GPIO_Port, DIP_3_Pin,
 		  GPIO_PIN_SET);
-
-  IMU_Status status = IMU_Init(
-		  &imu,
-		  &hspi1,
-		  GPIOA,
-		  GPIO_PIN_4,
-		  IMU_GYRO_ODR_1_66_KHZ,
-		  IMU_LPF1_ENABLED
-  );
 
   HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
   HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
@@ -324,16 +316,44 @@ int main(void)
                          &enc_left,   &enc_right,
                          &pi_left,    &pi_right);
 
+  IMU_Status imu_status;
+
+  imu_status = IMU_Init(
+		  &imu,
+		  &hspi1,
+		  IMU_CS_GPIO_Port,
+		  IMU_CS_Pin,
+		  IMU_GYRO_ODR_1_66_KHZ,
+		  IMU_LPF1_ENABLED
+  );
+
+  if (imu_status == 0)
+	  NeoPixel_SetColor(&neopixel, COLOR_GREEN);
+  else
+	  NeoPixel_SetColor(&neopixel, COLOR_GREEN);
+
+  NeoPixel_Show(&neopixel);
+
+
+
 //  IMU Calibration
-  if (status == IMU_OK) {
+
+  HAL_Delay(1000);
+
+  NeoPixel_SetColor(&neopixel, COLOR_BLUE);
+  NeoPixel_Show(&neopixel);
+
+  if (imu_status == IMU_OK) {
 	  IMU_CalibrateGyro(&imu, 500);
   } else {
 
   }
 
- HAL_TIM_Base_Start_IT(&htim6);
- HAL_TIM_Base_Start_IT(&htim3);
+  NeoPixel_Clear(&neopixel);
 
+ IMU_Update(&imu);
+
+ HAL_TIM_Base_Start_IT(&htim6);
 
   /* USER CODE END 2 */
 
@@ -342,22 +362,10 @@ int main(void)
 
   while (1)
   {
-      if (IR_Sensors_FrameReady())
-      {
-          const int32_t *ir = IR_Sensors_GetSignal();
-
-          int32_t ir1 = ir[0];
-          int32_t ir2 = ir[1];
-          int32_t ir3 = ir[2];
-          int32_t ir4 = ir[3];
-          int32_t ir5 = ir[4];
-          int32_t ir6 = ir[5];
-
-//        Simple IR test
-          printf("%d %d %d %d %d %d \r\n", ir1 > 1000, ir2 > 1000, ir3 > 1000, ir4 > 1000, ir5 > 1000, ir6 > 1000);
-
-          IR_Sensors_ClearFrameReady();
-      }
+	  if (IMU_UpdateIfReady(&imu))
+	  {
+		  printf("%.4f \r\n", gyro_integrator);
+	  }
   }
     /* USER CODE END WHILE */
 
@@ -1151,7 +1159,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : IMU_CS_Pin */
   GPIO_InitStruct.Pin = IMU_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(IMU_CS_GPIO_Port, &GPIO_InitStruct);
 
@@ -1175,6 +1183,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
   HAL_NVIC_SetPriority(EXTI4_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 

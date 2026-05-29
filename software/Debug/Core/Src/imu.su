@@ -3,7 +3,9 @@
 ../Core/Src/imu.c:20:13:IMU_WriteRegister	24	static
 ../Core/Src/imu.c:31:13:IMU_ReadRegisters	32	static
 ../Core/Src/imu.c:41:12:IMU_Init	32	static
-../Core/Src/imu.c:96:12:IMU_CalibrateGyro	32	static
-../Core/Src/imu.c:122:12:IMU_Update	24	static
-../Core/Src/imu.c:141:7:IMU_GetGyroZDeg	16	static
-../Core/Src/imu.c:150:7:IMU_GetGyroZRad	16	static
+../Core/Src/imu.c:112:12:IMU_CalibrateGyro	32	static
+../Core/Src/imu.c:138:12:IMU_Update	24	static
+../Core/Src/imu.c:157:6:IMU_NotifyDataReady	16	static
+../Core/Src/imu.c:165:9:IMU_UpdateIfReady	16	static
+../Core/Src/imu.c:178:7:IMU_GetGyroZDeg	16	static
+../Core/Src/imu.c:187:7:IMU_GetGyroZRad	16	static

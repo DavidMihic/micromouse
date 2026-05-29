@@ -24,7 +24,7 @@ static void IMU_WriteRegister(const IMU *imu, uint8_t reg, uint8_t value)
     tx[1] = value;
 
     IMU_CS_Select(imu);
-    HAL_SPI_Transmit(imu->hspi, tx, 2, HAL_MAX_DELAY);
+    HAL_SPI_Transmit(imu->hspi, tx, 2, IMU_SPI_TIMEOUT_MS);
     IMU_CS_Deselect(imu);
 }
 
@@ -33,8 +33,8 @@ static void IMU_ReadRegisters(const IMU *imu, uint8_t reg, uint8_t *data, uint8_
     uint8_t addr = reg | 0x80;
 
     IMU_CS_Select(imu);
-    HAL_SPI_Transmit(imu->hspi, &addr, 1, HAL_MAX_DELAY);
-    HAL_SPI_Receive(imu->hspi, data, len, HAL_MAX_DELAY);
+    HAL_SPI_Transmit(imu->hspi, &addr, 1, IMU_SPI_TIMEOUT_MS);
+    HAL_SPI_Receive(imu->hspi, data, len, IMU_SPI_TIMEOUT_MS);
     IMU_CS_Deselect(imu);
 }
 
@@ -53,11 +53,25 @@ IMU_Status IMU_Init(IMU *imu, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_port, ui
     imu->gyro_z_rad_s = 0.0f;
     imu->gyro_z_bias = 0.0f;
 
+    imu->data_ready = 0;
+
     IMU_CS_Deselect(imu);
-    HAL_Delay(10);
+    HAL_Delay(100);
 
     uint8_t who_am_i = 0;
-    IMU_ReadRegisters(imu, LSM6DSO32_REG_WHO_AM_I, &who_am_i, 1);
+
+    for (uint8_t i = 0; i < 100; i++)
+    {
+        IMU_ReadRegisters(imu, LSM6DSO32_REG_WHO_AM_I, &who_am_i, 1);
+
+        if (who_am_i == LSM6DSO32_WHO_AM_I_VAL)
+        {
+            break;
+        }
+
+        HAL_Delay(5);
+    } IMU_ReadRegisters(imu, LSM6DSO32_REG_WHO_AM_I, &who_am_i, 1);
+
     if (who_am_i != LSM6DSO32_WHO_AM_I_VAL)
     {
         return IMU_WRONG_DEVICE;
@@ -87,6 +101,8 @@ IMU_Status IMU_Init(IMU *imu, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_port, ui
     IMU_WriteRegister(imu, LSM6DSO32_REG_CTRL2_G, ctrl2_g_value);
 
     IMU_WriteRegister(imu, LSM6DSO32_REG_CTRL7_G, 0x00);
+
+    IMU_WriteRegister(imu, LSM6DSO32_REG_INT2_CTRL, LSM6DSO32_INT2_DRDY_G);
 
     HAL_Delay(50);
 
@@ -129,13 +145,34 @@ IMU_Status IMU_Update(IMU *imu)
     IMU_ReadRegisters(imu, LSM6DSO32_REG_OUTZ_L_G, data, 2);
 
     // negative because imu is on the bottom of the pcb
-    imu->raw_gyro_z = -1 * (int16_t)((data[1] << 8) | data[0]);
+    imu->raw_gyro_z = (int16_t)((data[1] << 8) | data[0]);
 
     float corrected_gyro = (float)imu->raw_gyro_z - imu->gyro_z_bias;
     imu->gyro_z_dps = corrected_gyro * LSM6DSO32_GYRO_SENS_1000;
-    imu->gyro_z_rad_s = imu->gyro_z_dps * PI / 180.0f;
+    imu->gyro_z_rad_s = imu->gyro_z_dps * IMU_PI_F / 180.0f;
 
     return IMU_OK;
+}
+
+void IMU_NotifyDataReady(IMU *imu)
+{
+    if (imu == NULL)
+        return;
+
+    imu->data_ready = 1;
+}
+
+uint8_t IMU_UpdateIfReady(IMU *imu)
+{
+    if (imu == NULL)
+        return 0;
+
+    if (imu->data_ready == 0)
+        return 0;
+
+    imu->data_ready = 0;
+
+    return (IMU_Update(imu) == IMU_OK) ? 1 : 0;
 }
 
 float IMU_GetGyroZDeg(const IMU *imu)
@@ -144,7 +181,7 @@ float IMU_GetGyroZDeg(const IMU *imu)
         return 0.0f;
 
 
-    return imu->gyro_z_dps;
+    return GYRO_Z_ANGLE_DIR * imu->gyro_z_dps;
 }
 
 float IMU_GetGyroZRad(const IMU *imu)
@@ -152,5 +189,5 @@ float IMU_GetGyroZRad(const IMU *imu)
     if (imu == NULL)
         return 0.0f;
 
-    return imu->gyro_z_rad_s;
+    return GYRO_Z_ANGLE_DIR*imu->gyro_z_rad_s;
 }

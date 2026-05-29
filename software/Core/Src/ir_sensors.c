@@ -169,6 +169,11 @@ const int32_t *IR_Sensors_GetSignal(void)
     return s_ir.signal;
 }
 
+const uint8_t *IR_Sensors_GetDigitalSignal(void)
+{
+	return s_ir.digital_signal;
+}
+
 
 IR_Status_t IR_Sensors_GetLastError(void)
 {

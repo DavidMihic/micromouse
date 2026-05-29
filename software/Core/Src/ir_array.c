@@ -463,6 +463,7 @@ void IR_Array_OnAdcConvCplt(IR_Array_t *ir, ADC_HandleTypeDef *hadc)
          * No ambient subtraction.
          */
         ir->signal[i] = 4095 - (int32_t)ir_get_mapped_sample(ir, i);
+        ir->digital_signal[i] = ir->signal[i] > IR_SEN_DIGTAL_TRESHOLD;
 
         ir->current_sensor++;
 

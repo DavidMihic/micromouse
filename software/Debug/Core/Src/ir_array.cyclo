@@ -15,6 +15,6 @@
 ../Core/Src/ir_array.c:334:6:IR_Array_Stop	2
 ../Core/Src/ir_array.c:349:6:IR_Array_OnTimerElapsed	8
 ../Core/Src/ir_array.c:408:6:IR_Array_OnAdcConvCplt	12
-../Core/Src/ir_array.c:502:6:IR_Array_IsBusy	3
-../Core/Src/ir_array.c:507:6:IR_Array_FrameReady	3
-../Core/Src/ir_array.c:512:6:IR_Array_ClearFrameReady	2
+../Core/Src/ir_array.c:503:6:IR_Array_IsBusy	3
+../Core/Src/ir_array.c:508:6:IR_Array_FrameReady	3
+../Core/Src/ir_array.c:513:6:IR_Array_ClearFrameReady	2

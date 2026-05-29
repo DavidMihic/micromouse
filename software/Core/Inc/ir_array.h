@@ -13,6 +13,7 @@
 #include "stm32g4xx_hal.h"
 
 #define IR_ARRAY_SENSOR_COUNT 6u
+#define IR_SEN_DIGTAL_TRESHOLD 1500
 
 typedef struct
 {
@@ -105,6 +106,7 @@ struct IR_Array
     IR_ChannelMap_t sensor_map[IR_ARRAY_SENSOR_COUNT];
 
     int32_t signal[IR_ARRAY_SENSOR_COUNT];
+    uint8_t digital_signal[IR_ARRAY_SENSOR_COUNT];
 
     uint16_t pulse_settle_us;
     uint16_t max_pulse_us;

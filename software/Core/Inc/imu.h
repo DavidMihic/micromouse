@@ -21,13 +21,19 @@
 #define LSM6DSO32_REG_CTRL7_G   0x16
 #define LSM6DSO32_REG_OUTZ_L_G  0x26
 #define LSM6DSO32_REG_OUTZ_H_G  0x27
+#define LSM6DSO32_REG_INT2_CTRL   0x0E
+#define LSM6DSO32_INT2_DRDY_G     0x02
 
 #define LSM6DSO32_WHO_AM_I_VAL  0x6C
 
 // Sensitivity factor for +-1000 dps is 35.00 mdps/LSB (datasheet)
 // Divide by 1000 to get dps = 0.035f
 #define LSM6DSO32_GYRO_SENS_1000 0.035f
-#define PI 3.14159265
+#define IMU_PI_F 3.14159265358979323846f
+#define IMU_SPI_TIMEOUT_MS 2
+
+// IMU is on the bottom of the PCB so its -1
+#define GYRO_Z_ANGLE_DIR -1
 
 typedef enum
 {
@@ -66,6 +72,8 @@ typedef struct
     IMU_Gyro_ODR odr_mode;
     IMU_LPF1_State lpf1_state;
 
+    volatile uint8_t data_ready;
+
     int16_t raw_gyro_z;
     float gyro_z_dps;
     float gyro_z_rad_s;
@@ -75,6 +83,9 @@ typedef struct
 IMU_Status IMU_Init(IMU *imu, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_port, uint16_t cs_pin, IMU_Gyro_ODR odr_mode, IMU_LPF1_State lpf1_state);
 IMU_Status IMU_CalibrateGyro(IMU *imu, uint16_t sample_count);
 IMU_Status IMU_Update(IMU *imu);
+
+void IMU_NotifyDataReady(IMU *imu);
+uint8_t IMU_UpdateIfReady(IMU *imu);
 
 float IMU_GetGyroZDeg(const IMU *imu);
 float IMU_GetGyroZRad(const IMU *imu);

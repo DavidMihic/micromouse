@@ -36,6 +36,7 @@ bool IR_Sensors_FrameReady(void);
 void IR_Sensors_ClearFrameReady(void);
 
 const int32_t *IR_Sensors_GetSignal(void);
+const uint8_t *IR_Sensors_GetDigitalSignal(void);
 const uint16_t *IR_Sensors_GetAmbient(void);
 const uint16_t *IR_Sensors_GetLit(void);
 
