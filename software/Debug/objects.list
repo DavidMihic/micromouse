@@ -4,6 +4,7 @@
 "./Core/Src/ir_array.o"
 "./Core/Src/ir_sensors.o"
 "./Core/Src/main.o"
+"./Core/Src/motion.o"
 "./Core/Src/motor.o"
 "./Core/Src/neopixel.o"
 "./Core/Src/robot_controller.o"

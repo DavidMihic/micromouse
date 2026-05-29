@@ -31,6 +31,7 @@
 #include "button.h"
 #include "robot_controller.h"
 #include "ir_sensors.h"
+#include "motion.h"
 
 /* USER CODE END Includes */
 
@@ -92,6 +93,8 @@ static void MX_TIM6_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM16_Init(void);
 /* USER CODE BEGIN PFP */
+void integrateOmega(float omega, float dt_s, float* yaw_out);
+static void App_GetMotionFeedback(MotionFeedback *fb);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -125,6 +128,8 @@ Encoder enc_right;
 NeoPixel neopixel;
 
 IMU imu;
+float yaw;
+float dt_imu;
 
 VelocityPI pi_left;
 VelocityPI pi_right;
@@ -144,6 +149,11 @@ IR_DemuxPins_t ir_demux = {
 };
 
 RobotController robot;
+
+static MotionController motion;
+static MotionCommand motion_cmd;
+
+static volatile uint32_t control_ticks = 0;
 
 int __io_putchar(int ch)
 {
@@ -195,18 +205,35 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 }
 
 
-float gyro_integrator = 0;
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if (htim->Instance == TIM6)
+	if(htim->Instance == TIM3)
 	{
-		RobotController_Update(&robot, dt);
-		gyro_integrator += IMU_GetGyroZRad(&imu) * dt * 180.0f / IMU_PI_F;
-
         if (!IR_Sensors_IsBusy() && !IR_Sensors_FrameReady())
         {
             IR_Sensors_StartFrame();
         }
+	}
+
+	if (htim->Instance == TIM6)
+	{
+
+        integrateOmega(IMU_GetGyroZRad(&imu), dt, &yaw);
+
+        MotionFeedback fb;
+        App_GetMotionFeedback(&fb);
+        Motion_Update(&motion, &fb, &motion_cmd);
+
+        if (motion_cmd.active)
+        {
+        	RobotController_SetCmdVel(&robot, motion_cmd.linear_mps, motion_cmd.angular_radps);
+        }
+        else
+        {
+        	RobotController_SetCmdVel(&robot, 0.0f, 0.0f);
+        }
+
+        RobotController_Update(&robot, dt);
 	}
 
     if (htim->Instance == TIM7)
@@ -222,6 +249,27 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 	IR_Sensors_OnAdcConvCplt(hadc);
 }
 
+void integrateOmega(float omega, float dt_s, float* yaw_out)
+{
+	*yaw_out += omega * dt_s;
+}
+
+
+static void App_GetMotionFeedback(MotionFeedback *fb)
+{
+    fb->x_m = RobotController_GetPoseX(&robot);
+    fb->y_m = RobotController_GetPoseY(&robot);
+
+    /*
+     * Use your best yaw estimate here.
+     * For now this can be encoder odometry yaw.
+     * Later you can use gyro-corrected yaw.
+     */
+    fb->yaw_rad = yaw;
+
+    fb->linear_speed_mps = RobotController_GetLinearVelocity(&robot);
+    fb->angular_speed_radps = IMU_GetGyroZRad(&imu);
+}
 
 /* USER CODE END 0 */
 
@@ -270,6 +318,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   dt = Timer_GetUpdatePeriod_s(&htim6);
+  dt_imu = Timer_GetUpdatePeriod_s(&htim3);
 
   Motor_Init(&motor_left);
   Motor_Init(&motor_right);
@@ -353,6 +402,32 @@ int main(void)
 
  IMU_Update(&imu);
 
+ MotionConfig cfg;
+
+ Motion_DefaultConfig(&cfg);
+
+ cfg.control_dt_s = dt;   // 100 Hz TIM6 loop
+
+ cfg.max_linear_speed_mps = 0.30f;
+ cfg.max_linear_accel_mps2 = 1.0f;
+
+ cfg.max_angular_speed_radps = 4.0f;
+ cfg.max_angular_accel_radps2 = 20.0f;
+
+ cfg.distance_kp = 8.0f;
+ cfg.heading_kp = 6.0f;
+ cfg.turn_kp = 10.0f;
+
+ /*
+  * Leave this disabled at first.
+  * Straight driving will only hold heading.
+  */
+ cfg.use_lateral_odometry_correction = false;
+ cfg.lateral_kp = 0.0f;
+
+ Motion_Init(&motion, &cfg);
+
+ HAL_TIM_Base_Start_IT(&htim3);
  HAL_TIM_Base_Start_IT(&htim6);
 
   /* USER CODE END 2 */
@@ -360,13 +435,24 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
+// MotionFeedback fb;
+//
+// App_GetMotionFeedback(&fb);
+//
+// Motion_StartStraight(&motion,
+//                      &fb,
+//                      0.180f,   // 18 cm
+//                      0.30f);
+
+
   while (1)
   {
 	  if (IMU_UpdateIfReady(&imu))
 	  {
-		  printf("%.4f \r\n", gyro_integrator);
+		  printf("yaw: %.4f \r\n", yaw);
 	  }
   }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
