@@ -6,15 +6,13 @@
  */
 #include "velocity_pi.h"
 
-static float clamp_float(float x, float min_val, float max_val)
+static float _clamp_float(float val, float min_val, float max_val)
 {
-    if (x > max_val)
-        return max_val;
-
-    if (x < min_val)
+    if (val < min_val)
         return min_val;
-
-    return x;
+    if (val > max_val)
+        return max_val;
+    return val;
 }
 
 void VelocityPI_Init(VelocityPI *pi,
@@ -79,17 +77,17 @@ float VelocityPI_Update(VelocityPI *pi, float measurement)
 
     float proportional = pi->kp * pi->error;
 
-//  Update
+    // Update
     pi->integrator += pi->ki * pi->error * pi->dt;
 
-//  Anti-windup
-    pi->integrator = clamp_float(pi->integrator,
+    // Anti-windup
+    pi->integrator = _clamp_float(pi->integrator,
                                  pi->output_min,
                                  pi->output_max);
 
     float raw_output = proportional + pi->integrator;
 
-    pi->output = clamp_float(raw_output,
+    pi->output = _clamp_float(raw_output,
                              pi->output_min,
                              pi->output_max);
 

@@ -4,46 +4,35 @@
 #define IR_ADC1_MASK 0x01u
 #define IR_ADC2_MASK 0x02u
 
-static void ir_write_pin(IR_Gpio_t p, bool high)
+static void _ir_write_pin(IR_Gpio_t p, bool high)
 {
     HAL_GPIO_WritePin(p.port, p.pin, high ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
-static void ir_set_enable(IR_Array_t *ir, bool enable)
+static void _ir_set_enable(IR_Array_t *ir, bool enable)
 {
     bool level = ir->demux_en_active_high ? enable : !enable;
-    ir_write_pin(ir->demux_en, level);
+    _ir_write_pin(ir->demux_en, level);
 }
 
-static void ir_set_address(IR_Array_t *ir, uint8_t index)
+static void _ir_set_address(IR_Array_t *ir, uint8_t index)
 {
-    ir_write_pin(ir->demux_a0, (index & 0x01u) != 0u);
-    ir_write_pin(ir->demux_a1, (index & 0x02u) != 0u);
-    ir_write_pin(ir->demux_a2, (index & 0x04u) != 0u);
+    _ir_write_pin(ir->demux_a0, (index & 0x01u) != 0u);
+    _ir_write_pin(ir->demux_a1, (index & 0x02u) != 0u);
+    _ir_write_pin(ir->demux_a2, (index & 0x04u) != 0u);
 }
 
-void IR_Array_AllEmittersOff(IR_Array_t *ir)
-{
-    if (ir == NULL)
-    {
-        return;
-    }
-
-    ir_set_enable(ir, false);
-    ir_set_address(ir, 0u);
-}
-
-static void ir_select_and_enable_led(IR_Array_t *ir, uint8_t index)
+static void _ir_select_and_enable_led(IR_Array_t *ir, uint8_t index)
 {
     /*
      * Disable first so the demux output cannot glitch while changing address.
      */
-    ir_set_enable(ir, false);
-    ir_set_address(ir, index);
-    ir_set_enable(ir, true);
+    _ir_set_enable(ir, false);
+    _ir_set_address(ir, index);
+    _ir_set_enable(ir, true);
 }
 
-static IR_Status_t ir_timer_start_us(IR_Array_t *ir, uint16_t us)
+static IR_Status_t _ir_timer_start_us(IR_Array_t *ir, uint16_t us)
 {
     if ((ir == NULL) || (ir->htim_us == NULL) || (us == 0u))
     {
@@ -64,7 +53,7 @@ static IR_Status_t ir_timer_start_us(IR_Array_t *ir, uint16_t us)
     return IR_OK;
 }
 
-static void ir_timer_stop(IR_Array_t *ir)
+static void _ir_timer_stop(IR_Array_t *ir)
 {
     if ((ir != NULL) && (ir->htim_us != NULL))
     {
@@ -72,7 +61,7 @@ static void ir_timer_stop(IR_Array_t *ir)
     }
 }
 
-static void ir_stop_adc(IR_Array_t *ir)
+static void _ir_stop_adc(IR_Array_t *ir)
 {
     if (ir == NULL)
     {
@@ -93,7 +82,7 @@ static void ir_stop_adc(IR_Array_t *ir)
     ir->adc_done_mask = 0u;
 }
 
-static IR_Status_t ir_start_adc(IR_Array_t *ir)
+static IR_Status_t _ir_start_adc(IR_Array_t *ir)
 {
     if (ir == NULL)
     {
@@ -113,7 +102,7 @@ static IR_Status_t ir_start_adc(IR_Array_t *ir)
                               (uint32_t *)ir->adc1_buf,
                               ir->adc1_len) != HAL_OK)
         {
-            ir_stop_adc(ir);
+            _ir_stop_adc(ir);
             return IR_HAL_ERROR;
         }
     }
@@ -128,7 +117,7 @@ static IR_Status_t ir_start_adc(IR_Array_t *ir)
                               (uint32_t *)ir->adc2_buf,
                               ir->adc2_len) != HAL_OK)
         {
-            ir_stop_adc(ir);
+            _ir_stop_adc(ir);
             return IR_HAL_ERROR;
         }
     }
@@ -141,7 +130,7 @@ static IR_Status_t ir_start_adc(IR_Array_t *ir)
     return IR_OK;
 }
 
-static uint16_t ir_get_mapped_sample(const IR_Array_t *ir, uint8_t sensor_index)
+static uint16_t _ir_get_mapped_sample(const IR_Array_t *ir, uint8_t sensor_index)
 {
     IR_ChannelMap_t map = ir->sensor_map[sensor_index];
 
@@ -158,11 +147,11 @@ static uint16_t ir_get_mapped_sample(const IR_Array_t *ir, uint8_t sensor_index)
     return 0u;
 }
 
-static void ir_fault(IR_Array_t *ir, IR_Status_t error)
+static void _ir_fault(IR_Array_t *ir, IR_Status_t error)
 {
     IR_Array_AllEmittersOff(ir);
-    ir_timer_stop(ir);
-    ir_stop_adc(ir);
+    _ir_timer_stop(ir);
+    _ir_stop_adc(ir);
 
     ir->last_error = error;
     ir->state = IR_STATE_FAULT;
@@ -174,7 +163,7 @@ static void ir_fault(IR_Array_t *ir, IR_Status_t error)
     }
 }
 
-static IR_Status_t ir_validate_init(const IR_Array_Init_t *init)
+static IR_Status_t _ir_validate_init(const IR_Array_Init_t *init)
 {
     if (init == NULL)
     {
@@ -239,7 +228,7 @@ IR_Status_t IR_Array_Init(IR_Array_t *ir, const IR_Array_Init_t *init)
         return IR_BAD_PARAM;
     }
 
-    status = ir_validate_init(init);
+    status = _ir_validate_init(init);
     if (status != IR_OK)
     {
         return status;
@@ -305,8 +294,8 @@ IR_Status_t IR_Array_StartFrame(IR_Array_t *ir)
     }
 
     IR_Array_AllEmittersOff(ir);
-    ir_stop_adc(ir);
-    ir_timer_stop(ir);
+    _ir_stop_adc(ir);
+    _ir_timer_stop(ir);
 
     ir->current_sensor = 0u;
     ir->frame_ready = false;
@@ -316,15 +305,15 @@ IR_Status_t IR_Array_StartFrame(IR_Array_t *ir)
     /*
      * Immediately enable first LED.
      */
-    ir_select_and_enable_led(ir, ir->current_sensor);
+    _ir_select_and_enable_led(ir, ir->current_sensor);
 
     ir->state = IR_STATE_PULSE_SETTLE;
 
-    status = ir_timer_start_us(ir, ir->pulse_settle_us);
+    status = _ir_timer_start_us(ir, ir->pulse_settle_us);
 
     if (status != IR_OK)
     {
-        ir_fault(ir, status);
+        _ir_fault(ir, status);
         return status;
     }
 
@@ -339,11 +328,22 @@ void IR_Array_Stop(IR_Array_t *ir)
     }
 
     IR_Array_AllEmittersOff(ir);
-    ir_timer_stop(ir);
-    ir_stop_adc(ir);
+    _ir_timer_stop(ir);
+    _ir_stop_adc(ir);
 
     ir->busy = false;
     ir->state = IR_STATE_IDLE;
+}
+
+void IR_Array_AllEmittersOff(IR_Array_t *ir)
+{
+    if (ir == NULL)
+    {
+        return;
+    }
+
+    _ir_set_enable(ir, false);
+    _ir_set_address(ir, 0u);
 }
 
 void IR_Array_OnTimerElapsed(IR_Array_t *ir, TIM_HandleTypeDef *htim)
@@ -358,7 +358,7 @@ void IR_Array_OnTimerElapsed(IR_Array_t *ir, TIM_HandleTypeDef *htim)
     /*
      * Software one-shot timer.
      */
-    ir_timer_stop(ir);
+    _ir_timer_stop(ir);
 
     switch (ir->state)
     {
@@ -368,10 +368,10 @@ void IR_Array_OnTimerElapsed(IR_Array_t *ir, TIM_HandleTypeDef *htim)
 
             ir->state = IR_STATE_LIT_ADC;
 
-            status = ir_start_adc(ir);
+            status = _ir_start_adc(ir);
             if (status != IR_OK)
             {
-                ir_fault(ir, status);
+                _ir_fault(ir, status);
                 return;
             }
 
@@ -384,10 +384,10 @@ void IR_Array_OnTimerElapsed(IR_Array_t *ir, TIM_HandleTypeDef *htim)
                 remaining_us = 1u;
             }
 
-            status = ir_timer_start_us(ir, remaining_us);
+            status = _ir_timer_start_us(ir, remaining_us);
             if (status != IR_OK)
             {
-                ir_fault(ir, status);
+                _ir_fault(ir, status);
             }
             break;
         }
@@ -396,7 +396,7 @@ void IR_Array_OnTimerElapsed(IR_Array_t *ir, TIM_HandleTypeDef *htim)
             /*
              * Timeout while LED may be on. Force everything off.
              */
-            ir_fault(ir, IR_TIMEOUT);
+            _ir_fault(ir, IR_TIMEOUT);
             break;
 
         default:
@@ -440,8 +440,8 @@ void IR_Array_OnAdcConvCplt(IR_Array_t *ir, ADC_HandleTypeDef *hadc)
     /*
      * Both ADC DMA transfers are complete.
      */
-    ir_timer_stop(ir);
-    ir_stop_adc(ir);
+    _ir_timer_stop(ir);
+    _ir_stop_adc(ir);
 
     /*
      * Turn off immediately before doing anything else.
@@ -452,7 +452,7 @@ void IR_Array_OnAdcConvCplt(IR_Array_t *ir, ADC_HandleTypeDef *hadc)
 
     if (i >= IR_ARRAY_SENSOR_COUNT)
     {
-        ir_fault(ir, IR_BAD_PARAM);
+        _ir_fault(ir, IR_BAD_PARAM);
         return;
     }
 
@@ -462,7 +462,7 @@ void IR_Array_OnAdcConvCplt(IR_Array_t *ir, ADC_HandleTypeDef *hadc)
          * Raw ADC value with this LED on.
          * No ambient subtraction.
          */
-        ir->signal[i] = 4095 - (int32_t)ir_get_mapped_sample(ir, i);
+        ir->signal[i] = 4095 - (int32_t)_ir_get_mapped_sample(ir, i);
         ir->digital_signal[i] = ir->signal[i] > IR_SEN_DIGTAL_TRESHOLD;
 
         ir->current_sensor++;
@@ -484,13 +484,13 @@ void IR_Array_OnAdcConvCplt(IR_Array_t *ir, ADC_HandleTypeDef *hadc)
             /*
              * Enable next LED and repeat.
              */
-            ir_select_and_enable_led(ir, ir->current_sensor);
+            _ir_select_and_enable_led(ir, ir->current_sensor);
 
             ir->state = IR_STATE_PULSE_SETTLE;
 
-            if (ir_timer_start_us(ir, ir->pulse_settle_us) != IR_OK)
+            if (_ir_timer_start_us(ir, ir->pulse_settle_us) != IR_OK)
             {
-                ir_fault(ir, IR_HAL_ERROR);
+                _ir_fault(ir, IR_HAL_ERROR);
             }
         }
     }

@@ -13,11 +13,11 @@
 #include "velocity_pi.h"
 
 #define ROBOT_WHEEL_RADIUS_M   0.016f   // 16 mm radius
-#define ROBOT_WHEEL_BASE_M     0.0765f   // 76,5 mm track width
+#define ROBOT_WHEEL_BASE_M     0.076f   // 76 mm track width
 
 #define ROBOT_MAX_WHEEL_SPEED_RAD_S  125.0f
-#define ROBOT_MAX_LINEAR_VEL_M_S     2.0f // max linear = r * 125 = 2
-#define ROBOT_MAX_ANGULAR_VEL_RAD_S  52.29f // max angular = r * 2 * 125 / L = 52.29
+#define ROBOT_MAX_LINEAR_VEL_M_S     2.0f    // max linear = r * 125 = 2
+#define ROBOT_MAX_ANGULAR_VEL_RAD_S  52.29f  // max angular = r * 2 * 125 / L = 52.29
 
 typedef struct
 {

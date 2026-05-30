@@ -1,0 +1,10 @@
+../Core/Src/app.c:101:5:__io_putchar	16	static
+../Core/Src/app.c:107:14:Timer_GetUpdatePeriod_s	40	static
+../Core/Src/app.c:127:6:_integrate_omega	24	static
+../Core/Src/app.c:132:13:App_GetMotionFeedback	16	static
+../Core/Src/app.c:147:6:HAL_TIM_PWM_PulseFinishedCallback	16	static
+../Core/Src/app.c:153:6:HAL_GPIO_EXTI_Callback	16	static
+../Core/Src/app.c:164:6:HAL_TIM_PeriodElapsedCallback	40	static
+../Core/Src/app.c:193:6:HAL_ADC_ConvCpltCallback	16	static
+../Core/Src/app.c:202:6:App_Init	96	static
+../Core/Src/app.c:306:6:App_Loop	8	static

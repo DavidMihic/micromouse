@@ -1,3 +1,4 @@
+"./Core/Src/app.o"
 "./Core/Src/button.o"
 "./Core/Src/encoder.o"
 "./Core/Src/imu.o"

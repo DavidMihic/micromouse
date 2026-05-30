@@ -4,6 +4,6 @@
 ../Core/Src/neopixel.c:36:17:NeoPixel_Init	24	static
 ../Core/Src/neopixel.c:54:17:NeoPixel_SetColorRGB	16	static
 ../Core/Src/neopixel.c:66:17:NeoPixel_SetColor	16	static
-../Core/Src/neopixel.c:76:17:NeoPixel_Clear	16	static
+../Core/Src/neopixel.c:76:17:NeoPixel_Off	16	static
 ../Core/Src/neopixel.c:82:17:NeoPixel_Show	32	static
 ../Core/Src/neopixel.c:124:6:NeoPixel_DMA_Callback	16	static

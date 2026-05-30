@@ -16,21 +16,21 @@ const NeoPixel_Color COLOR_YELLOW      = { .red = 100, .green = 100, .blue = 0 }
 const NeoPixel_Color COLOR_ORANGE      = { .red = 80,  .green = 20,  .blue = 0 };
 const NeoPixel_Color COLOR_MAGENTA     = { .red = 100, .green = 0,   .blue = 100};
 
-static uint32_t get_pwm_top(TIM_HandleTypeDef *htim)
+static uint32_t _get_pwm_top(TIM_HandleTypeDef *htim)
 {
     return __HAL_TIM_GET_AUTORELOAD(htim) + 1U;
 }
 
-static uint16_t get_pwm_hi_ticks(TIM_HandleTypeDef *htim)
+static uint16_t _get_pwm_hi_ticks(TIM_HandleTypeDef *htim)
 {
-    // Logička 1: ~64% duty cycle-a
-    return (uint16_t)((get_pwm_top(htim) * 64U) / 100U);
+    // Logic 1: ~64% duty cycle
+    return (uint16_t)((_get_pwm_top(htim) * 64U) / 100U);
 }
 
-static uint16_t get_pwm_lo_ticks(TIM_HandleTypeDef *htim)
+static uint16_t _get_pwm_lo_ticks(TIM_HandleTypeDef *htim)
 {
-    // Logička 0: ~32% duty cycle-a
-    return (uint16_t)((get_pwm_top(htim) * 32U) / 100U);
+    // Logic 0: ~32% duty cycle
+    return (uint16_t)((_get_pwm_top(htim) * 32U) / 100U);
 }
 
 NeoPixel_Status NeoPixel_Init(NeoPixel *pixel, TIM_HandleTypeDef *htim, uint32_t channel)
@@ -42,7 +42,6 @@ NeoPixel_Status NeoPixel_Init(NeoPixel *pixel, TIM_HandleTypeDef *htim, uint32_t
     pixel->channel = channel;
     pixel->is_transferring = 0;
 
-    // Inicijalizacija buffera i boje na nulu
     memset(pixel->dma_buffer, 0, sizeof(pixel->dma_buffer));
     pixel->color.red = 0;
     pixel->color.green = 0;
@@ -73,7 +72,7 @@ NeoPixel_Status NeoPixel_SetColor(NeoPixel *pixel, NeoPixel_Color color)
 	return NEOPIXEL_OK;
 }
 
-NeoPixel_Status NeoPixel_Clear(NeoPixel *pixel)
+NeoPixel_Status NeoPixel_Off(NeoPixel *pixel)
 {
 	NeoPixel_SetColorRGB(pixel, 0, 0, 0);
     return NeoPixel_Show(pixel);
@@ -84,34 +83,24 @@ NeoPixel_Status NeoPixel_Show(NeoPixel *pixel)
     if (pixel == NULL || pixel->htim == NULL)
         return NEOPIXEL_ERROR;
 
-    // Ako je prethodni DMA prijenos još u tijeku, ne prekidaj ga
     if (pixel->is_transferring)
         return NEOPIXEL_BUSY;
 
-    uint16_t pwm_hi = get_pwm_hi_ticks(pixel->htim);
-    uint16_t pwm_lo = get_pwm_lo_ticks(pixel->htim);
+    uint16_t pwm_hi = _get_pwm_hi_ticks(pixel->htim);
+    uint16_t pwm_lo = _get_pwm_lo_ticks(pixel->htim);
 
-    // WS2812 protokol: Podaci se šalju u formatu GREEN -> RED -> BLUE (MSB first)
     uint32_t color_word = (pixel->color.green << 16) | (pixel->color.red << 8) | pixel->color.blue;
 
-    // Punjenje prvih 24 mjesta u bufferu s izračunatim PWM vrijednostima
     for (int8_t bit = 23; bit >= 0; bit--)
     {
         if (color_word & (1UL << bit))
-        {
             pixel->dma_buffer[23 - bit] = pwm_hi;
-        }
         else
-        {
             pixel->dma_buffer[23 - bit] = pwm_lo;
-        }
     }
-
-    // Ostatak buffera (RESET_SLOTS) je već postavljen na 0 prilikom Init-a i čisti se u callbacku
 
     pixel->is_transferring = 1;
 
-    // Pokretanje DMA prijenosa na isti način kako se pokreće običan PWM, ali s bufferom
     if (HAL_TIM_PWM_Start_DMA(pixel->htim, pixel->channel, (uint32_t *)pixel->dma_buffer, NEOPIXEL_BUFFER_SIZE) != HAL_OK)
     {
         pixel->is_transferring = 0;
@@ -126,7 +115,6 @@ void NeoPixel_DMA_Callback(NeoPixel *pixel, TIM_HandleTypeDef *htim)
     if (pixel == NULL || htim == NULL)
         return;
 
-    // Provjera je li prekid stigao od tajmera koji pripada ovoj NeoPixel instanci
     if (htim == pixel->htim)
     {
         HAL_TIM_PWM_Stop_DMA(pixel->htim, pixel->channel);

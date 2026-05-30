@@ -4,6 +4,6 @@
 ../Core/Src/neopixel.c:36:17:NeoPixel_Init	3
 ../Core/Src/neopixel.c:54:17:NeoPixel_SetColorRGB	2
 ../Core/Src/neopixel.c:66:17:NeoPixel_SetColor	2
-../Core/Src/neopixel.c:76:17:NeoPixel_Clear	1
+../Core/Src/neopixel.c:76:17:NeoPixel_Off	1
 ../Core/Src/neopixel.c:82:17:NeoPixel_Show	7
 ../Core/Src/neopixel.c:124:6:NeoPixel_DMA_Callback	9

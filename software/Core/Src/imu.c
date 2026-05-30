@@ -59,23 +59,22 @@ IMU_Status IMU_Init(IMU *imu, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_port, ui
     HAL_Delay(100);
 
     uint8_t who_am_i = 0;
-
+    bool who_am_i_passed = false;
     for (uint8_t i = 0; i < 100; i++)
     {
         IMU_ReadRegisters(imu, LSM6DSO32_REG_WHO_AM_I, &who_am_i, 1);
 
         if (who_am_i == LSM6DSO32_WHO_AM_I_VAL)
         {
-            break;
+        	who_am_i_passed = true;
+        	break;
         }
 
         HAL_Delay(5);
-    } IMU_ReadRegisters(imu, LSM6DSO32_REG_WHO_AM_I, &who_am_i, 1);
-
-    if (who_am_i != LSM6DSO32_WHO_AM_I_VAL)
-    {
-        return IMU_WRONG_DEVICE;
     }
+
+    if (!who_am_i_passed)
+    	return IMU_WRONG_DEVICE;
 
     // CTRL3_C (BDU=1, IF_INC=1)
     IMU_WriteRegister(imu, LSM6DSO32_REG_CTRL3_C, 0x44);

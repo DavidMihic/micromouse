@@ -10,6 +10,7 @@
 
 #include "stm32g4xx_hal.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 /* LSM6DSO32 Registri */
 #define LSM6DSO32_REG_WHO_AM_I  0x0F

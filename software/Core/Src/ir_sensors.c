@@ -7,6 +7,7 @@
 
 
 #include "ir_sensors.h"
+#include "params.h"
 #include <stddef.h>
 
 /*
@@ -18,15 +19,6 @@
  */
 #define IR_ADC1_CHANNEL_COUNT 4u
 #define IR_ADC2_CHANNEL_COUNT 2u
-
-/*
- * Timing values.
- *
- * Keep max_pulse_us short so the IR LEDs cannot remain on for long.
- */
-#define IR_PULSE_SETTLE_US   100u
-#define IR_MAX_PULSE_US      200u
-#define IR_ADC_TIMEOUT_US    1000u
 
 static IR_Array_t s_ir;
 
@@ -94,9 +86,9 @@ IR_Status_t IR_Sensors_Init(ADC_HandleTypeDef *hadc1,
     init.sensor_map[4] = (IR_ChannelMap_t){IR_ADC_1, 3};
     init.sensor_map[5] = (IR_ChannelMap_t){IR_ADC_2, 1};
 
-    init.pulse_settle_us = IR_PULSE_SETTLE_US;
-    init.max_pulse_us = IR_MAX_PULSE_US;
-    init.adc_timeout_us = IR_ADC_TIMEOUT_US;
+    init.pulse_settle_us = PARAM_IR_PULSE_SETTLE_US;
+    init.max_pulse_us = PARAM_IR_MAX_PULSE_US;
+    init.adc_timeout_us = PARAM_IR_ADC_TIMEOUT_US;
 
     init.frame_done_cb = NULL;
 

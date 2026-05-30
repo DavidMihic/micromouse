@@ -1,5 +1,4 @@
-Core/Src/ir_sensors.o: ../Core/Src/ir_sensors.c ../Core/Inc/ir_sensors.h \
- ../Core/Inc/ir_array.h \
+Core/Src/app.o: ../Core/Src/app.c ../Core/Inc/app.h ../Core/Inc/main.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal.h \
  ../Core/Inc/stm32g4xx_hal_conf.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_rcc.h \
@@ -34,9 +33,13 @@ Core/Src/ir_sensors.o: ../Core/Src/ir_sensors.c ../Core/Inc/ir_sensors.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim_ex.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h \
- ../Core/Inc/params.h
-../Core/Inc/ir_sensors.h:
-../Core/Inc/ir_array.h:
+ ../Core/Inc/params.h ../Core/Inc/motor.h ../Core/Inc/encoder.h \
+ ../Core/Inc/neopixel.h ../Core/Inc/imu.h ../Core/Inc/velocity_pi.h \
+ ../Core/Inc/button.h ../Core/Inc/robot_controller.h \
+ ../Core/Inc/encoder.h ../Core/Inc/motor.h ../Core/Inc/velocity_pi.h \
+ ../Core/Inc/ir_sensors.h ../Core/Inc/ir_array.h ../Core/Inc/motion.h
+../Core/Inc/app.h:
+../Core/Inc/main.h:
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal.h:
 ../Core/Inc/stm32g4xx_hal_conf.h:
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_rcc.h:
@@ -72,3 +75,16 @@ Core/Src/ir_sensors.o: ../Core/Src/ir_sensors.c ../Core/Inc/ir_sensors.h \
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart.h:
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h:
 ../Core/Inc/params.h:
+../Core/Inc/motor.h:
+../Core/Inc/encoder.h:
+../Core/Inc/neopixel.h:
+../Core/Inc/imu.h:
+../Core/Inc/velocity_pi.h:
+../Core/Inc/button.h:
+../Core/Inc/robot_controller.h:
+../Core/Inc/encoder.h:
+../Core/Inc/motor.h:
+../Core/Inc/velocity_pi.h:
+../Core/Inc/ir_sensors.h:
+../Core/Inc/ir_array.h:
+../Core/Inc/motion.h:
