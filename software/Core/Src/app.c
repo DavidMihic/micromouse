@@ -22,6 +22,7 @@
 #include "robot_controller.h"
 #include "ir_sensors.h"
 #include "motion.h"
+#include "navigator.h"
 
 // Defined in main.c because of MX
 extern ADC_HandleTypeDef  hadc1;
@@ -93,6 +94,9 @@ RobotController robot;
 
 static MotionController motion;
 static MotionCommand motion_cmd;
+
+NavigatorConfig nav_cfg;
+Navigator navigator;
 
 /* ------------------------------------------------------------------------- */
 /* Helpers                                                                   */
@@ -174,6 +178,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         MotionFeedback fb;
         App_GetMotionFeedback(&fb);
         Motion_Update(&motion, &fb, &motion_cmd);
+
+        Navigator_ControlTick(&navigator, &fb, &motion_cmd);
 
         if (motion_cmd.active)
             RobotController_SetCmdVel(&robot, motion_cmd.linear_mps, motion_cmd.angular_radps);
@@ -299,28 +305,33 @@ void App_Init(void)
 
     Motion_Init(&motion, &cfg);
 
+	Navigator_DefaultConfig(&nav_cfg);
+	nav_cfg.cruise_speed_mps = 0.10f;
+	nav_cfg.turn_speed_radps = 3.0f;
+	Navigator_Init(&navigator, &motion, &robot, &nav_cfg, HEADING_NORTH);
+
     HAL_TIM_Base_Start_IT(&htim3);
     HAL_TIM_Base_Start_IT(&htim6);
 }
 
 void App_Loop(void)
 {
+	IMU_UpdateIfReady(&imu);
+
 	if (IR_Sensors_FrameReady())
-	{
-		const int32_t *ir = IR_Sensors_GetSignal();
-
-		int32_t ir1 = ir[0];
-		int32_t ir2 = ir[1];
-		int32_t ir3 = ir[2];
-		int32_t ir4 = ir[3];
-		int32_t ir5 = ir[4];
-		int32_t ir6 = ir[5];
-
 		IR_Sensors_ClearFrameReady();
+
+	if (Button_HasClickedEvent(&btn1) && Navigator_IsIdle(&navigator))
+	{
+		MotionFeedback fb;
+		App_GetMotionFeedback(&fb);
+		Navigator_MoveForwardCells(&navigator, &fb, 2);
 	}
 
-	if (IMU_UpdateIfReady(&imu))
+	if (Button_HasClickedEvent(&btn2) && Navigator_IsIdle(&navigator))
 	{
-//	    printf("gyro raw: %d\r\n", imu.raw_gyro_z);
+		MotionFeedback fb;
+		App_GetMotionFeedback(&fb);
+		Navigator_TurnRight(&navigator, &fb);
 	}
 }

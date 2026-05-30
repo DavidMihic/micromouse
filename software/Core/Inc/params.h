@@ -10,6 +10,9 @@
 #ifndef INC_PARAMS_H_
 #define INC_PARAMS_H_
 
+#define PARAM_CELL_DIM 0.16f // metres
+#define PARAM_MAZE_DIM 18u
+
 /* ------------------------------------------------------------------------- */
 /* Wheel velocity PI                                                         */
 /* ------------------------------------------------------------------------- */
