@@ -7,4 +7,4 @@
 ../Core/Src/app.c:164:6:HAL_TIM_PeriodElapsedCallback	40	static
 ../Core/Src/app.c:193:6:HAL_ADC_ConvCpltCallback	16	static
 ../Core/Src/app.c:202:6:App_Init	96	static
-../Core/Src/app.c:306:6:App_Loop	8	static
+../Core/Src/app.c:306:6:App_Loop	40	static

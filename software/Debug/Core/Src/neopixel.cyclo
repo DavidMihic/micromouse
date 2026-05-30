@@ -1,9 +1,9 @@
-../Core/Src/neopixel.c:19:17:get_pwm_top	1
-../Core/Src/neopixel.c:24:17:get_pwm_hi_ticks	1
-../Core/Src/neopixel.c:30:17:get_pwm_lo_ticks	1
+../Core/Src/neopixel.c:19:17:_get_pwm_top	1
+../Core/Src/neopixel.c:24:17:_get_pwm_hi_ticks	1
+../Core/Src/neopixel.c:30:17:_get_pwm_lo_ticks	1
 ../Core/Src/neopixel.c:36:17:NeoPixel_Init	3
-../Core/Src/neopixel.c:54:17:NeoPixel_SetColorRGB	2
-../Core/Src/neopixel.c:66:17:NeoPixel_SetColor	2
-../Core/Src/neopixel.c:76:17:NeoPixel_Off	1
-../Core/Src/neopixel.c:82:17:NeoPixel_Show	7
-../Core/Src/neopixel.c:124:6:NeoPixel_DMA_Callback	9
+../Core/Src/neopixel.c:53:17:NeoPixel_SetColorRGB	2
+../Core/Src/neopixel.c:65:17:NeoPixel_SetColor	2
+../Core/Src/neopixel.c:75:17:NeoPixel_Off	1
+../Core/Src/neopixel.c:81:17:NeoPixel_Show	7
+../Core/Src/neopixel.c:113:6:NeoPixel_DMA_Callback	9

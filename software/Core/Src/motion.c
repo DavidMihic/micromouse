@@ -81,10 +81,14 @@ static bool _update_finish_counter(MotionController *motion,
                                   bool slow_enough)
 {
     if (near_target && slow_enough)
+    {
         if (motion->settle_counter < motion->cfg.finish_settle_samples)
             motion->settle_counter++;
+    }
     else
+    {
         motion->settle_counter = 0;
+    }
 
     return motion->settle_counter >= motion->cfg.finish_settle_samples;
 }
@@ -255,7 +259,7 @@ static void _update_turn(MotionController *motion,
     /*
      * Use accumulated unwrapped yaw change so that turns across +/-pi work.
      */
-    delta_yaw = wrap_pi(feedback->yaw_rad - motion->last_yaw_rad);
+    delta_yaw = _wrap_pi(feedback->yaw_rad - motion->last_yaw_rad);
     motion->accumulated_turn_rad += delta_yaw;
     motion->last_yaw_rad = feedback->yaw_rad;
 
