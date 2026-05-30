@@ -46,7 +46,7 @@
 
 #define PARAM_MOTION_DISTANCE_KP        4.75f
 #define PARAM_MOTION_HEADING_KP         6.0f
-#define PARAM_MOTION_TURN_KP            9.0f
+#define PARAM_MOTION_TURN_KP            9.5f
 
 #define PARAM_MOTION_USE_LATERAL_CORR   false
 #define PARAM_MOTION_LATERAL_KP         0.0f
@@ -70,5 +70,11 @@
 #define PARAM_IR_PULSE_SETTLE_US        100u
 #define PARAM_IR_MAX_PULSE_US           200u
 #define PARAM_IR_ADC_TIMEOUT_US         1000u
+
+/* ------------------------------------------------------------------------- */
+/* Navigation / exploration                                                  */
+/* ------------------------------------------------------------------------- */
+/* Forward nudge to the cell centre before pivoting at a turn (metres). */
+#define PARAM_NAV_TURN_APPROACH_M       0.10f
 
 #endif /* INC_PARAMS_H_ */

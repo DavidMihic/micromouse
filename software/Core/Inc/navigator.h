@@ -59,7 +59,22 @@ typedef struct NavigatorConfig
     int32_t front_wall_threshold;
 
     /*
-     * Diagonal sensor reading when the robot is centred in the corridor.
+	 * Safety stop: if both front sensors exceed this (a wall is very close)
+	 * during a straight, the move is aborted so the robot does not crash.
+	 * Set higher (closer) than front_wall_threshold.
+	 */
+	int32_t front_stop_threshold;
+
+	/*
+	 * Front-wall ranging target. During an approach-to-front move the robot
+	 * drives forward until both front sensors reach this value, then stops,
+	 * positioning it at a fixed (centred) distance from the front wall.
+	 * Must be lower (farther) than front_stop_threshold.
+	 */
+	int32_t front_center_threshold;
+
+    /*
+     * Diagonal sensor reading when the robot is centered in the corridor.
      * Used for single-wall following. Must be calibrated. For a corridor with
      * walls on both sides the reference cancels out and is not needed.
      */
@@ -97,9 +112,15 @@ typedef struct Navigator
     /* Edge detection for motion completion. */
     bool was_busy;
 
-    int32_t last_diag_left;
-	int32_t last_diag_right;
-	float   last_correction;
+    /* Debug: last values computed in Navigator_ControlTick. */
+    int32_t  last_diag_left;
+	int32_t  last_diag_right;
+	float    last_correction;
+	uint32_t control_tick_count;
+	bool      last_walls_present;
+	bool      last_front_blocked;
+	bool 	  ranging_front;
+	bool	  front_guard;
 
 } Navigator;
 
@@ -116,6 +137,14 @@ void Navigator_Init(Navigator *nav,
  * Poll Navigator_IsBusy() / Navigator_IsIdle() to wait for completion.
  * feedback must be the same pose/yaw feedback fed to Motion_Update.
  */
+bool Navigator_MoveDistance(Navigator *nav, const MotionFeedback *feedback, float meters);
+/*
+ * Drive forward (up to max_meters) until the front wall reaches the centred
+ * ranging distance (front_center_threshold), then stop. Use when a front wall
+ * is present to position the robot at a repeatable distance from it. Does not
+ * advance the cell counter.
+ */
+bool Navigator_ApproachFrontWall(Navigator *nav, const MotionFeedback *feedback, float max_meters);
 bool Navigator_MoveForward(Navigator *nav, const MotionFeedback *feedback);
 bool Navigator_MoveForwardCells(Navigator *nav, const MotionFeedback *feedback, int32_t cells);
 bool Navigator_TurnLeft(Navigator *nav, const MotionFeedback *feedback);
@@ -144,8 +173,12 @@ Heading Navigator_GetHeading(const Navigator *nav);
 int32_t Navigator_GetCellX(const Navigator *nav);
 int32_t Navigator_GetCellY(const Navigator *nav);
 
+/* Debug helpers (values from the last Navigator_ControlTick call). */
 int32_t Navigator_GetLastDiagLeft(const Navigator *nav);
 int32_t Navigator_GetLastDiagRight(const Navigator *nav);
 float   Navigator_GetLastCorrection(const Navigator *nav);
 bool    Navigator_CenteringActive(const Navigator *nav);
+uint32_t Navigator_GetTickCount(const Navigator *nav);
+bool    Navigator_WallsPresent(const Navigator *nav);
+bool    Navigator_FrontBlocked(const Navigator *nav);
 #endif /* INC_NAVIGATOR_H_ */

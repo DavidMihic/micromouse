@@ -9,6 +9,7 @@
 #include "main.h"
 
 #include "params.h"
+#include "belief_maze.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +24,7 @@
 #include "ir_sensors.h"
 #include "motion.h"
 #include "navigator.h"
+#include "explorer.h"
 
 // Defined in main.c because of MX
 extern ADC_HandleTypeDef  hadc1;
@@ -97,6 +99,8 @@ static MotionCommand motion_cmd;
 
 NavigatorConfig nav_cfg;
 Navigator navigator;
+
+Explorer explorer;
 
 /* ------------------------------------------------------------------------- */
 /* Helpers                                                                   */
@@ -310,6 +314,9 @@ void App_Init(void)
 	nav_cfg.turn_speed_radps = 3.0f;
 	Navigator_Init(&navigator, &motion, &robot, &nav_cfg, HEADING_NORTH);
 
+	belief_maze_init();
+	Explorer_Init(&explorer, &navigator);
+
     HAL_TIM_Base_Start_IT(&htim3);
     HAL_TIM_Base_Start_IT(&htim6);
 }
@@ -323,15 +330,19 @@ void App_Loop(void)
 
 	if (Button_HasClickedEvent(&btn1) && Navigator_IsIdle(&navigator))
 	{
-		MotionFeedback fb;
-		App_GetMotionFeedback(&fb);
-		Navigator_MoveForwardCells(&navigator, &fb, 2);
+		Explorer_Begin(&explorer, true);
 	}
 
 	if (Button_HasClickedEvent(&btn2) && Navigator_IsIdle(&navigator))
 	{
 		MotionFeedback fb;
 		App_GetMotionFeedback(&fb);
-		Navigator_TurnRight(&navigator, &fb);
+		Navigator_MoveForwardCells(&navigator, &fb, 2);
+	}
+
+	{
+		MotionFeedback fb;
+		App_GetMotionFeedback(&fb);
+		Explorer_Tick(&explorer, &fb);
 	}
 }

@@ -1,4 +1,6 @@
-Core/Src/app.o: ../Core/Src/app.c ../Core/Inc/app.h ../Core/Inc/main.h \
+Core/Src/explorer.o: ../Core/Src/explorer.c ../Core/Inc/explorer.h \
+ ../Core/Inc/navigator.h ../Core/Inc/motion.h \
+ ../Core/Inc/robot_controller.h ../Core/Inc/encoder.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal.h \
  ../Core/Inc/stm32g4xx_hal_conf.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_rcc.h \
@@ -33,16 +35,14 @@ Core/Src/app.o: ../Core/Src/app.c ../Core/Inc/app.h ../Core/Inc/main.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim_ex.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart.h \
  ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h \
- ../Core/Inc/params.h ../Core/Inc/belief_maze.h ../Core/Inc/types.h \
- ../Core/Inc/motor.h ../Core/Inc/encoder.h ../Core/Inc/neopixel.h \
- ../Core/Inc/imu.h ../Core/Inc/velocity_pi.h ../Core/Inc/button.h \
- ../Core/Inc/robot_controller.h ../Core/Inc/encoder.h ../Core/Inc/motor.h \
- ../Core/Inc/velocity_pi.h ../Core/Inc/ir_sensors.h \
- ../Core/Inc/ir_array.h ../Core/Inc/motion.h ../Core/Inc/navigator.h \
- ../Core/Inc/motion.h ../Core/Inc/robot_controller.h \
- ../Core/Inc/explorer.h ../Core/Inc/navigator.h ../Core/Inc/planner.h
-../Core/Inc/app.h:
-../Core/Inc/main.h:
+ ../Core/Inc/motor.h ../Core/Inc/velocity_pi.h ../Core/Inc/planner.h \
+ ../Core/Inc/types.h ../Core/Inc/params.h ../Core/Inc/belief_maze.h \
+ ../Core/Inc/floodfill.h
+../Core/Inc/explorer.h:
+../Core/Inc/navigator.h:
+../Core/Inc/motion.h:
+../Core/Inc/robot_controller.h:
+../Core/Inc/encoder.h:
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal.h:
 ../Core/Inc/stm32g4xx_hal_conf.h:
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_rcc.h:
@@ -77,25 +77,10 @@ Core/Src/app.o: ../Core/Src/app.c ../Core/Inc/app.h ../Core/Inc/main.h \
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_tim_ex.h:
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart.h:
 ../Drivers/STM32G4xx_HAL_Driver/Inc/stm32g4xx_hal_uart_ex.h:
+../Core/Inc/motor.h:
+../Core/Inc/velocity_pi.h:
+../Core/Inc/planner.h:
+../Core/Inc/types.h:
 ../Core/Inc/params.h:
 ../Core/Inc/belief_maze.h:
-../Core/Inc/types.h:
-../Core/Inc/motor.h:
-../Core/Inc/encoder.h:
-../Core/Inc/neopixel.h:
-../Core/Inc/imu.h:
-../Core/Inc/velocity_pi.h:
-../Core/Inc/button.h:
-../Core/Inc/robot_controller.h:
-../Core/Inc/encoder.h:
-../Core/Inc/motor.h:
-../Core/Inc/velocity_pi.h:
-../Core/Inc/ir_sensors.h:
-../Core/Inc/ir_array.h:
-../Core/Inc/motion.h:
-../Core/Inc/navigator.h:
-../Core/Inc/motion.h:
-../Core/Inc/robot_controller.h:
-../Core/Inc/explorer.h:
-../Core/Inc/navigator.h:
-../Core/Inc/planner.h:
+../Core/Inc/floodfill.h:
