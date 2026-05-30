@@ -318,4 +318,9 @@ void App_Loop(void)
 
 		IR_Sensors_ClearFrameReady();
 	}
+
+	if (IMU_UpdateIfReady(&imu))
+	{
+//	    printf("gyro raw: %d\r\n", imu.raw_gyro_z);
+	}
 }
