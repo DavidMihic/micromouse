@@ -920,6 +920,17 @@ void App_Init(void)
 
 uint32_t lastms = 0;
 
+NeoPixel_Color colors[7] = {
+		COLOR_RED,
+		COLOR_GREEN,
+		COLOR_BLUE,
+		COLOR_YELLOW,
+		COLOR_ORANGE,
+		COLOR_MAGENTA,
+		COLOR_OFF
+};
+uint8_t color_idx = 0;
+
 void App_Loop(void)
 {
 	if (IR_Sensors_FrameReady())
@@ -932,7 +943,11 @@ void App_Loop(void)
 
 	IMU_UpdateIfReady(&imu);
 
-	/* ---- Telemetry to ESP32 dashboard (USART2), ~20 Hz ---- */
+	NeoPixel_SetColor(&neopixel, colors[color_idx]);
+	NeoPixel_Show(&neopixel);
+	color_idx = (color_idx + 1) % 7;
+
+	/* ---- Telemetry to ESP32 dashboard (USART2), ~40 Hz ---- */
 	static uint32_t tlm_last_ms = 0;
 	uint32_t tlm_now = HAL_GetTick();
 	if (tlm_now - tlm_last_ms >= 50)
@@ -940,9 +955,10 @@ void App_Loop(void)
 		tlm_last_ms = tlm_now;
 
 		const int32_t *ir = IR_Sensors_GetSignal();
+		NeoPixel_Color color = NeoPixel_GetColor(&neopixel);
 
-//		bool b1 = (HAL_GPIO_ReadPin(BTN_1_GPIO_Port, BTN_1_Pin) == GPIO_PIN_RESET);
-//		bool b2 = (HAL_GPIO_ReadPin(BTN_2_GPIO_Port, BTN_2_Pin) == GPIO_PIN_RESET);
+		bool b1 = (HAL_GPIO_ReadPin(BTN_1_GPIO_Port, BTN_1_Pin) == GPIO_PIN_RESET);
+		bool b2 = (HAL_GPIO_ReadPin(BTN_2_GPIO_Port, BTN_2_Pin) == GPIO_PIN_RESET);
 
 		printf("{\"ir\":[%ld,%ld,%ld,%ld,%ld,%ld],"
 			   "\"gyro\":{\"z\":%.2f},\"yaw\":%.3f,"
@@ -965,9 +981,8 @@ void App_Loop(void)
 			   RobotController_GetPoseTheta(&robot),
 			   RobotController_GetLinearVelocity(&robot),
 			   RobotController_GetAngularVelocity(&robot),
-			   Button_HasClickedEvent(&btn1) ? 1 : 0,
-			   Button_HasClickedEvent(&btn2) ? 1 : 0,
+			   b1 ? 0 : 1, b2 ? 0 : 1,
 			   DipSwitch_GetValue(&dip_sw),
-			   neopixel.color.red, neopixel.color.green, neopixel.color.blue);
+			   color.red, color.green, color.blue);
 	}
 }

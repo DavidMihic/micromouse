@@ -24,4 +24,4 @@
 ../Core/Src/app.c:702:13:App_StartFastRunAfterButton	16	static
 ../Core/Src/app.c:747:13:App_HandleMazeSolverFinished	72	static
 ../Core/Src/app.c:816:6:App_Init	96	static
-../Core/Src/app.c:923:6:App_Loop	264	static
+../Core/Src/app.c:923:6:App_Loop	272	static
