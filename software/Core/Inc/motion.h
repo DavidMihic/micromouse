@@ -121,4 +121,6 @@ bool Motion_IsDone(const MotionController *motion);
 MotionMode Motion_GetMode(const MotionController *motion);
 float Motion_GetRemaining(const MotionController *motion);
 
+void Motion_ForceDone(MotionController *motion);
+
 #endif /* INC_MOTION_H_ */

@@ -1,5 +1,0 @@
-../Core/Src/belief_maze.c:14:6:belief_maze_init	2
-../Core/Src/belief_maze.c:38:6:belief_maze_has_wall	7
-../Core/Src/belief_maze.c:50:6:belief_maze_has_wall_pessimistic	11
-../Core/Src/belief_maze.c:69:6:belief_maze_set_wall	19
-../Core/Src/belief_maze.c:116:6:belief_maze_is_known	7

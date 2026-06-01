@@ -13,7 +13,7 @@
 #include "stm32g4xx_hal.h"
 
 #define IR_ARRAY_SENSOR_COUNT 6u
-#define IR_SEN_DIGTAL_TRESHOLD 2000
+#define IR_SEN_DIGTAL_TRESHOLD 1500
 
 typedef struct
 {

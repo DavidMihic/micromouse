@@ -86,9 +86,7 @@ static bool _update_finish_counter(MotionController *motion,
             motion->settle_counter++;
     }
     else
-    {
         motion->settle_counter = 0;
-    }
 
     return motion->settle_counter >= motion->cfg.finish_settle_samples;
 }
@@ -513,6 +511,19 @@ void Motion_Stop(MotionController *motion)
     motion->mode = MOTION_ABORTED;
     motion->previous_linear_mps = 0.0f;
     motion->previous_angular_radps = 0.0f;
+    motion->settle_counter = 0;
+}
+
+void Motion_ForceDone(MotionController *motion)
+{
+    if (motion == NULL)
+        return;
+
+    motion->mode = MOTION_DONE;
+
+    motion->previous_linear_mps = 0.0f;
+    motion->previous_angular_radps = 0.0f;
+    motion->last_remaining = 0.0f;
     motion->settle_counter = 0;
 }
 

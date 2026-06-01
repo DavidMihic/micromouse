@@ -1,7 +1,0 @@
-../Core/Src/planner.c:11:18:pick_next	13
-../Core/Src/planner.c:38:11:planner_next_move	1
-../Core/Src/planner.c:42:11:planner_next_move_belief	1
-../Core/Src/planner.c:46:11:planner_next_move_belief_pessimistic	1
-../Core/Src/planner.c:50:6:planner_move	5
-../Core/Src/planner.c:60:5:planner_at_goal	4
-../Core/Src/planner.c:67:5:planner_at_start	3

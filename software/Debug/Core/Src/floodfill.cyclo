@@ -1,6 +1,0 @@
-../Core/Src/floodfill.c:18:13:floodfill_run_seeded	17
-../Core/Src/floodfill.c:73:6:floodfill_compute	1
-../Core/Src/floodfill.c:77:6:floodfill_compute_on_belief	1
-../Core/Src/floodfill.c:81:6:floodfill_compute_on_belief_pessimistic	1
-../Core/Src/floodfill.c:85:6:floodfill_compute_return_on_belief	1
-../Core/Src/floodfill.c:92:6:floodfill_print	4
