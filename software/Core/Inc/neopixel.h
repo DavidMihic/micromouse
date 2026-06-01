@@ -53,6 +53,7 @@ NeoPixel_Status NeoPixel_Init(NeoPixel *pixel, TIM_HandleTypeDef *htim, uint32_t
 
 NeoPixel_Status NeoPixel_SetColorRGB(NeoPixel *pixel, uint8_t r, uint8_t g, uint8_t b);
 NeoPixel_Status NeoPixel_SetColor(NeoPixel *pixel, NeoPixel_Color color);
+NeoPixel_Color NeoPixel_GetColor(NeoPixel *pixel);
 NeoPixel_Status NeoPixel_Off(NeoPixel *pixel);
 NeoPixel_Status NeoPixel_Show(NeoPixel *pixel);
 

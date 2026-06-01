@@ -4,6 +4,7 @@
 ../Core/Src/neopixel.c:36:17:NeoPixel_Init	24	static
 ../Core/Src/neopixel.c:53:17:NeoPixel_SetColorRGB	16	static
 ../Core/Src/neopixel.c:65:17:NeoPixel_SetColor	16	static
-../Core/Src/neopixel.c:75:17:NeoPixel_Off	16	static
-../Core/Src/neopixel.c:81:17:NeoPixel_Show	32	static
-../Core/Src/neopixel.c:113:6:NeoPixel_DMA_Callback	16	static
+../Core/Src/neopixel.c:75:16:NeoPixel_GetColor	24	static
+../Core/Src/neopixel.c:80:17:NeoPixel_Off	16	static
+../Core/Src/neopixel.c:86:17:NeoPixel_Show	32	static
+../Core/Src/neopixel.c:118:6:NeoPixel_DMA_Callback	16	static

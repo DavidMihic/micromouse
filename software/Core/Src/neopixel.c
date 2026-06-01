@@ -72,6 +72,11 @@ NeoPixel_Status NeoPixel_SetColor(NeoPixel *pixel, NeoPixel_Color color)
 	return NEOPIXEL_OK;
 }
 
+NeoPixel_Color NeoPixel_GetColor(NeoPixel *pixel)
+{
+	return pixel->color;
+}
+
 NeoPixel_Status NeoPixel_Off(NeoPixel *pixel)
 {
 	NeoPixel_SetColorRGB(pixel, 0, 0, 0);

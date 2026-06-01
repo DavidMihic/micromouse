@@ -304,21 +304,6 @@ static void App_UpdateWallAssistFromIr(void)
         PARAM_CENTERING_KP_RADPS_PER_COUNT *
         error_counts;
 
-    static uint16_t dbg_div = 0;
-
-    if (++dbg_div >= 20)
-    {
-        dbg_div = 0;
-
-        printf("LD=%.0f RD=%.0f FL=%.0f FR=%.0f valid=%d omega=%.2f\r\n",
-               wall_assist.left_diag,
-               wall_assist.right_diag,
-               wall_assist.front_l,
-               wall_assist.front_r,
-               wall_assist.center_valid ? 1 : 0,
-               wall_assist.center_omega_radps);
-    }
-
     wall_assist.center_omega_radps =
         App_ClampFloat(wall_assist.center_omega_radps,
                        -PARAM_CENTERING_MAX_OMEGA_RADPS,
@@ -937,56 +922,52 @@ uint32_t lastms = 0;
 
 void App_Loop(void)
 {
-	if (front_emergency_abort)
+	if (IR_Sensors_FrameReady())
 	{
-	    front_emergency_abort = false;
-	    printf("Front wall emergency stop\r\n");
-	    App_StopMazeSolver();
+		uint32_t now = HAL_GetTick();
+		if (now - lastms >= 50)
+			lastms = now;
+		IR_Sensors_ClearFrameReady();
 	}
 
-	if (Button_HasClickedEvent(&btn1))
+	IMU_UpdateIfReady(&imu);
+
+	/* ---- Telemetry to ESP32 dashboard (USART2), ~20 Hz ---- */
+	static uint32_t tlm_last_ms = 0;
+	uint32_t tlm_now = HAL_GetTick();
+	if (tlm_now - tlm_last_ms >= 50)
 	{
-	    if (maze_phase == APP_MAZE_PHASE_WAIT_FAST_BUTTON)
-	    {
-	        App_StartFastRunAfterButton();
-	    }
-	    else if (!maze_solver_active)
-	    {
-	        App_StartMazeSolver();
-	    }
-	    else
-	    {
-	        App_StopMazeSolver();
-	    }
+		tlm_last_ms = tlm_now;
+
+		const int32_t *ir = IR_Sensors_GetSignal();
+
+//		bool b1 = (HAL_GPIO_ReadPin(BTN_1_GPIO_Port, BTN_1_Pin) == GPIO_PIN_RESET);
+//		bool b2 = (HAL_GPIO_ReadPin(BTN_2_GPIO_Port, BTN_2_Pin) == GPIO_PIN_RESET);
+
+		printf("{\"ir\":[%ld,%ld,%ld,%ld,%ld,%ld],"
+			   "\"gyro\":{\"z\":%.2f},\"yaw\":%.3f,"
+			   "\"odo\":{\"l\":%ld,\"r\":%ld},"
+			   "\"speed\":{\"l\":%.2f,\"r\":%.2f},"
+			   "\"pose\":{\"x\":%.3f,\"y\":%.3f,\"th\":%.3f},"
+			   "\"v\":%.3f,\"w\":%.3f,"
+			   "\"btn\":{\"b1\":%d,\"b2\":%d},"
+			   "\"dip\":%d,"
+			   "\"led\":{\"r\":%d,\"g\":%d,\"b\":%d}}\r\n",
+			   (long)ir[0], (long)ir[1], (long)ir[2],
+			   (long)ir[3], (long)ir[4], (long)ir[5],
+			   IMU_GetGyroZDeg(&imu), yaw,
+			   (long)Encoder_GetPositionTicks(&enc_left),
+			   (long)Encoder_GetPositionTicks(&enc_right),
+			   Encoder_GetVelocityRadPerSecond(&enc_left),
+			   Encoder_GetVelocityRadPerSecond(&enc_right),
+			   RobotController_GetPoseX(&robot),
+			   RobotController_GetPoseY(&robot),
+			   RobotController_GetPoseTheta(&robot),
+			   RobotController_GetLinearVelocity(&robot),
+			   RobotController_GetAngularVelocity(&robot),
+			   Button_HasClickedEvent(&btn1) ? 1 : 0,
+			   Button_HasClickedEvent(&btn2) ? 1 : 0,
+			   DipSwitch_GetValue(&dip_sw),
+			   neopixel.color.red, neopixel.color.green, neopixel.color.blue);
 	}
-
-	    if (Button_HasClickedEvent(&btn2))
-	    {
-	        App_StopMazeSolver();
-	    }
-
-	    if (maze_solver_active)
-	    {
-	        MazeSolverStatus status = MazeSolver_Task(&maze_solver);
-
-	        if (status != MAZE_SOLVER_RUNNING)
-	            App_HandleMazeSolverFinished(status);
-	    }
-	    else
-	    {
-
-	        if (IR_Sensors_FrameReady())
-	        {
-	        	const int32_t *irr = IR_Sensors_GetSignal();
-	        	uint32_t now = HAL_GetTick();
-	        	if(now - lastms >= 50)
-	        	{
-//	        		printf("L_D: %ld | R_D: %d | F_R: %ld \r\n", irr[4], irr[1], irr[2]);
-	        		lastms = now;
-	        	}
-	            IR_Sensors_ClearFrameReady();
-	        }
-	    }
-
-	    IMU_UpdateIfReady(&imu);
 }
