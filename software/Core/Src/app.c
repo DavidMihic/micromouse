@@ -114,6 +114,7 @@ typedef enum
 } AppMazePhase;
 
 static volatile AppMazePhase maze_phase = APP_MAZE_PHASE_IDLE;
+static bool led_cycle_enabled = false;
 
 /* ---- Command reception from ESP32 (USART2 RX) ---- */
 #define CMD_BUF_SIZE 64
@@ -841,6 +842,23 @@ void App_Usart2_OnRxByte(uint8_t byte)
     }
 }
 
+void App_Process_UART_Input(const char * cmd)
+{
+	if (strcmp(cmd, "reset_odom") == 0)
+	{
+		RobotController_ResetOdometry(&robot);
+		Encoder_Reset(&enc_left);
+		Encoder_Reset(&enc_right);
+		yaw = 0.0f;
+	}
+	else if (strcmp(cmd, "cycle_led") == 0)
+	{
+		led_cycle_enabled = !led_cycle_enabled;
+		if (!led_cycle_enabled)
+			NeoPixel_Off(&neopixel);
+	}
+}
+
 /* ------------------------------------------------------------------------- */
 /* Public API                                                                */
 /* ------------------------------------------------------------------------- */
@@ -980,16 +998,7 @@ void App_Loop(void)
 
 	if (cmd_ready)
 	{
-		NeoPixel_SetColorRGB(&neopixel, 100, 100, 100);
-		NeoPixel_Show(&neopixel);
-
-		if (strcmp((char *)cmd_line, "RESET_ODOM") == 0)
-		{
-			RobotController_ResetOdometry(&robot);
-			Encoder_Reset(&enc_left);
-			Encoder_Reset(&enc_right);
-			yaw = 0.0f;
-		}
+		App_Process_UART_Input((char *) cmd_line);
 		cmd_ready = false;
 	}
 
@@ -999,7 +1008,7 @@ void App_Loop(void)
 	static uint32_t tlm_last_ms_1000 = 0;
 	uint32_t tlm_now = HAL_GetTick();
 
-	if (tlm_now - tlm_last_ms_1000 >= 1000)
+	if (led_cycle_enabled && tlm_now - tlm_last_ms_1000 >= 1000)
 	{
 		tlm_last_ms_1000 = tlm_now;
 		NeoPixel_SetColor(&neopixel, colors[color_idx]);

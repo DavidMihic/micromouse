@@ -24,5 +24,6 @@
 ../Core/Src/app.c:711:13:App_StartFastRunAfterButton	16	static
 ../Core/Src/app.c:756:13:App_HandleMazeSolverFinished	72	static
 ../Core/Src/app.c:821:6:App_Usart2_OnRxByte	24	static
-../Core/Src/app.c:851:6:App_Init	96	static
-../Core/Src/app.c:972:6:App_Loop	280	static
+../Core/Src/app.c:845:6:App_Process_UART_Input	16	static
+../Core/Src/app.c:866:6:App_Init	96	static
+../Core/Src/app.c:987:6:App_Loop	272	static
