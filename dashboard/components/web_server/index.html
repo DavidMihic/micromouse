@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Micromouse Dashboard</title>
+  <script defer src="/script.js"></script>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>Micromouse Dashboard <span id="status">connecting...</span></header>
+  <div class="grid">
+    <div class="card"><h2>IR sensors</h2><div id="ir"></div></div>
+    <div class="card"><h2>Gyro (°/s)</h2><div id="gyro"></div></div>
+    <div class="card"><h2>Pose</h2><div id="pose"></div></div>
+    <div class="card"><h2>Odometry</h2>
+      <div id="odom"></div>
+      <button id="btn-reset-odom">Reset Odometry</button>
+    </div>
+    <div class="card"><h2>Wheel speed</h2><div id="speed"></div></div>
+    <div class="card"><h2>Motion</h2><div id="motion"></div></div>
+    <div class="card"><h2>Buttons</h2><div id="btn"></div></div>
+    <div class="card"><h2>DIP switch</h2><div id="dip"></div></div>
+    <div class="card"><h2>Neopixel</h2><div class="swatch" id="led"></div></div>
+  </div>
+</body>
+</html>

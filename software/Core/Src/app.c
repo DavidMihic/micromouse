@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 #include "motor.h"
 #include "encoder.h"
@@ -113,6 +114,13 @@ typedef enum
 } AppMazePhase;
 
 static volatile AppMazePhase maze_phase = APP_MAZE_PHASE_IDLE;
+
+/* ---- Command reception from ESP32 (USART2 RX) ---- */
+#define CMD_BUF_SIZE 64
+static volatile char    cmd_line[CMD_BUF_SIZE];
+static volatile bool    cmd_ready = false;
+static char             cmd_assembly[CMD_BUF_SIZE];
+static volatile uint8_t cmd_len = 0;
 
 /* ------------------------------------------------------------------------- */
 /* Helpers                                                                   */
@@ -809,6 +817,30 @@ static void App_HandleMazeSolverFinished(MazeSolverStatus status)
     NeoPixel_Show(&neopixel);
 }
 
+void App_Usart2_OnRxByte(uint8_t byte)
+{
+    char c = (char)byte;
+
+    if (c == '\n' || c == '\r')
+    {
+        if (cmd_len > 0 && !cmd_ready)
+        {
+            memcpy((char *)cmd_line, cmd_assembly, cmd_len);
+            cmd_line[cmd_len] = '\0';
+            cmd_ready = true;
+        }
+        cmd_len = 0;
+    }
+    else if (cmd_len < CMD_BUF_SIZE - 1)
+    {
+        cmd_assembly[cmd_len++] = c;
+    }
+    else
+    {
+        cmd_len = 0;   // overflow, drop line
+    }
+}
+
 /* ------------------------------------------------------------------------- */
 /* Public API                                                                */
 /* ------------------------------------------------------------------------- */
@@ -916,18 +948,21 @@ void App_Init(void)
 
     HAL_TIM_Base_Start_IT(&htim3);
     HAL_TIM_Base_Start_IT(&htim6);
+
+    __HAL_UART_ENABLE_IT(&huart2, UART_IT_RXNE);
 }
 
 uint32_t lastms = 0;
+NeoPixel_Color COLOR_OFF = { .red = 0, .green = 0, .blue = 0 };
 
-NeoPixel_Color colors[7] = {
-		COLOR_RED,
-		COLOR_GREEN,
-		COLOR_BLUE,
-		COLOR_YELLOW,
-		COLOR_ORANGE,
-		COLOR_MAGENTA,
-		COLOR_OFF
+static const NeoPixel_Color colors[] = {
+		{100, 0,    0},
+		{0,   100,  0},
+		{0,   0,    100},
+		{100, 100,  0},
+		{80,  20,   0},
+		{100, 0,    100},
+		{0,   0,    0}
 };
 uint8_t color_idx = 0;
 
@@ -943,35 +978,58 @@ void App_Loop(void)
 
 	IMU_UpdateIfReady(&imu);
 
-	NeoPixel_SetColor(&neopixel, colors[color_idx]);
-	NeoPixel_Show(&neopixel);
-	color_idx = (color_idx + 1) % 7;
+	if (cmd_ready)
+	{
+		NeoPixel_SetColorRGB(&neopixel, 100, 100, 100);
+		NeoPixel_Show(&neopixel);
+
+		if (strcmp((char *)cmd_line, "RESET_ODOM") == 0)
+		{
+			RobotController_ResetOdometry(&robot);
+			Encoder_Reset(&enc_left);
+			Encoder_Reset(&enc_right);
+			yaw = 0.0f;
+		}
+		cmd_ready = false;
+	}
+
 
 	/* ---- Telemetry to ESP32 dashboard (USART2), ~40 Hz ---- */
-	static uint32_t tlm_last_ms = 0;
+	static uint32_t tlm_last_ms_50 = 0;
+	static uint32_t tlm_last_ms_1000 = 0;
 	uint32_t tlm_now = HAL_GetTick();
-	if (tlm_now - tlm_last_ms >= 50)
+
+	if (tlm_now - tlm_last_ms_1000 >= 1000)
 	{
-		tlm_last_ms = tlm_now;
+		tlm_last_ms_1000 = tlm_now;
+		NeoPixel_SetColor(&neopixel, colors[color_idx]);
+		NeoPixel_Show(&neopixel);
+		color_idx = (color_idx + 1) % 7;
+	}
+
+	if (tlm_now - tlm_last_ms_50 >= 50)
+	{
+		tlm_last_ms_50 = tlm_now;
 
 		const int32_t *ir = IR_Sensors_GetSignal();
 		NeoPixel_Color color = NeoPixel_GetColor(&neopixel);
+
 
 		bool b1 = (HAL_GPIO_ReadPin(BTN_1_GPIO_Port, BTN_1_Pin) == GPIO_PIN_RESET);
 		bool b2 = (HAL_GPIO_ReadPin(BTN_2_GPIO_Port, BTN_2_Pin) == GPIO_PIN_RESET);
 
 		printf("{\"ir\":[%ld,%ld,%ld,%ld,%ld,%ld],"
-			   "\"gyro\":{\"z\":%.2f},\"yaw\":%.3f,"
-			   "\"odo\":{\"l\":%ld,\"r\":%ld},"
-			   "\"speed\":{\"l\":%.2f,\"r\":%.2f},"
-			   "\"pose\":{\"x\":%.3f,\"y\":%.3f,\"th\":%.3f},"
+			   "\"gyro\":{\"Z\":%.2f},\"Yaw\":%.3f,"
+			   "\"odom\":{\"Left\":%ld,\"Right\":%ld},"
+			   "\"speed\":{\"Left\":%.2f,\"Right\":%.2f},"
+			   "\"pose\":{\"X\":%.3f,\"Y\":%.3f,\"Theta\":%.3f},"
 			   "\"v\":%.3f,\"w\":%.3f,"
-			   "\"btn\":{\"b1\":%d,\"b2\":%d},"
+			   "\"btn\":{\"SW1\":%d,\"SW2\":%d},"
 			   "\"dip\":%d,"
 			   "\"led\":{\"r\":%d,\"g\":%d,\"b\":%d}}\r\n",
 			   (long)ir[0], (long)ir[1], (long)ir[2],
 			   (long)ir[3], (long)ir[4], (long)ir[5],
-			   IMU_GetGyroZDeg(&imu), yaw,
+			   IMU_GetGyroZDeg(&imu), (yaw * 180.0f / APP_PI_F),
 			   (long)Encoder_GetPositionTicks(&enc_left),
 			   (long)Encoder_GetPositionTicks(&enc_right),
 			   Encoder_GetVelocityRadPerSecond(&enc_left),

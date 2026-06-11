@@ -5,6 +5,8 @@
  *      Author: david
  */
 
+#include <stdint.h>
+
 #ifndef INC_APP_H_
 #define INC_APP_H_
 
@@ -12,5 +14,7 @@
 void App_Init(void);
 
 void App_Loop(void);
+
+void App_Usart2_OnRxByte(uint8_t byte);
 
 #endif /* INC_APP_H_ */
